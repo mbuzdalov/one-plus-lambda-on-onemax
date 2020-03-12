@@ -1,48 +1,33 @@
 package com.github.mbuzdalov.opl
 
 class OnePlusLambda(n: Int, lambda: Int) {
-  private[this] val choose = {
-    val result = new Array[Array[Double]](n + 1)
-    var i = 0
+  private[this] val logFactorial = {
+    val result = new Array[Double](n + 1)
+    var i = 2
     while (i <= n) {
-      result(i) = new Array(i + 1)
-      result(i)(0) = 1
-      result(i)(i) = 1
-      var j = 1
-      while (j < i) {
-        result(i)(j) = result(i - 1)(j - 1) + result(i - 1)(j)
-        j += 1
-      }
+      result(i) = result(i - 1) + math.log(i)
       i += 1
     }
     result
   }
 
-  private def normalize(target: Array[Double]): Unit = {
-    var sumT = 0.0
-    var i = 0
-    while (i < target.length) {
-      sumT += target(i)
-      i += 1
-    }
-    assert(sumT >= 0.999 && sumT <= 1.001, s"sum = $sumT")
-    i = 0
-    while (i < target.length) {
-      target(i) /= sumT
-      i += 1
-    }
-  }
+  private[this] def logChoose(n: Int, k: Int): Double = logFactorial(n) - logFactorial(n - k) - logFactorial(k)
 
   private def multiplyInPlace(a: Array[Double], b: Array[Double]): Unit = {
-    var aa, bb = 0.0
+    var aa, bb, sum = 0.0
     var i = 0
     while (i < a.length) {
       aa += a(i)
       bb += b(i)
       a(i) = aa * b(i) + bb * a(i) - a(i) * b(i)
+      sum += a(i)
       i += 1
     }
-    normalize(a)
+    i = 0
+    while (i < a.length)_{
+      a(i) /= sum
+      i += 1
+    }
   }
 
   private def multiplyByPower(power: Int, unit: Array[Double], result: Array[Double]): Unit = {
@@ -59,11 +44,8 @@ class OnePlusLambda(n: Int, lambda: Int) {
     if (change == 0) Double.PositiveInfinity else {
       val lower = math.max(0, change - n + d)
       val upper = math.min(change, d)
-      val denom = 1 / choose(n)(change)
-      val cd = choose(d)
-      val cnd = choose(n - d)
-
-      val prob = Array.tabulate(upper - lower + 1)(okay => cd(okay + lower) * cnd(change - okay - lower) * denom)
+      val cnc = logChoose(n, change)
+      val prob = Array.tabulate(upper - lower + 1)(okay => math.exp(logChoose(d, okay + lower) + logChoose(n - d, change - okay - lower) - cnc))
       assert(math.abs(prob.sum - 1) < 1e-9, s"prob.sum = ${prob.sum} at n=$n, d=$d, change=$change")
       multiplyByPower(lambda - 1, prob.clone(), prob)
 
