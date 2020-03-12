@@ -1,2 +1,23 @@
 *.class
 *.log
+
+# Package Files #
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Java VM crash logs
+hs_err_pid*
+
+# IntelliJ IDEA stuff
+.idea/
+/out/
+/project/build.properties
+
+# SBT files
+/target/
+/project/project/
+/project/target/
