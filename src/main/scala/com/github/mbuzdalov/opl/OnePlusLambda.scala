@@ -1,17 +1,9 @@
 package com.github.mbuzdalov.opl
 
-class OnePlusLambda(n: Int, lambda: Int) {
-  private[this] val logFactorial = {
-    val result = new Array[Double](n + 1)
-    var i = 2
-    while (i <= n) {
-      result(i) = result(i - 1) + math.log(i)
-      i += 1
-    }
-    result
-  }
+import scala.Ordering.Double.IeeeOrdering
 
-  private[this] def logChoose(n: Int, k: Int): Double = logFactorial(n) - logFactorial(n - k) - logFactorial(k)
+class OnePlusLambda(n: Int, lambda: Int) {
+  private[this] val logChoose = new MathEx.LogChoose(n)
 
   private def multiplyInPlace(a: Array[Double], b: Array[Double]): Unit = {
     var aa, bb, sum = 0.0
@@ -24,7 +16,7 @@ class OnePlusLambda(n: Int, lambda: Int) {
       i += 1
     }
     i = 0
-    while (i < a.length)_{
+    while (i < a.length) {
       a(i) /= sum
       i += 1
     }

@@ -5,6 +5,8 @@ import java.io._
 import java.util._
 import javax.imageio._
 
+import scala.Ordering.Double.IeeeOrdering
+
 object Plotter {
   def main(args: Array[String]): Unit = {
     val root = args(0)
