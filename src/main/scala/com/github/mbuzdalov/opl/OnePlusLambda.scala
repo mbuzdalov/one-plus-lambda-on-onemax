@@ -44,6 +44,11 @@ class OnePlusLambda(n: Int, lambda: Int) {
     }
   }
 
+  def optimalExpectedTime: Double = {
+    val logAll = math.log(2) * n
+    (0 to n).map(d => getOptimalTime(d) * math.exp(logChoose(n, d) - logAll)).sum
+  }
+
   def getDriftOptimalTime(d: Int): Double = {
     if (d == 0)
       0.0
@@ -54,6 +59,11 @@ class OnePlusLambda(n: Int, lambda: Int) {
       }
       driftMaximizingCache(d - 1)
     }
+  }
+
+  def driftOptimalExpectedTime: Double = {
+    val logAll = math.log(2) * n
+    (0 to n).map(d => getDriftOptimalTime(d) * math.exp(logChoose(n, d) - logAll)).sum
   }
 
   def getOptimalTime(d: Int, l: Int): Double = {

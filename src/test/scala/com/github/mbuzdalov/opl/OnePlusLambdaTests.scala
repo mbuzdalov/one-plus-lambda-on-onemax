@@ -1,16 +1,13 @@
 package com.github.mbuzdalov.opl
 
-import com.github.mbuzdalov.opl.MathEx.LogChoose
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 class OnePlusLambdaTests extends AnyFlatSpec with Matchers {
   private def optimalTimes(n: Int): (Double, Double) = {
-    val logAll = math.log(2) * n
     val opl = new OnePlusLambda(n, 1)
-    val logChoose = new LogChoose(n)
-    val optimalTime = (0 to n).map(d => opl.getOptimalTime(d) * math.exp(logChoose(n, d) - logAll)).sum
-    val driftOptimalTime = (0 to n).map(d => opl.getDriftOptimalTime(d) * math.exp(logChoose(n, d) - logAll)).sum
+    val optimalTime = opl.optimalExpectedTime
+    val driftOptimalTime = opl.driftOptimalExpectedTime
     (optimalTime, driftOptimalTime)
   }
 
