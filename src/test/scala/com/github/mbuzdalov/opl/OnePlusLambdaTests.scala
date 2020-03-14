@@ -31,7 +31,7 @@ class OnePlusLambdaTests extends AnyFlatSpec with Matchers {
 
   "(1+100) RLS time" should "be right for n=500" in {
     val (optimalTime, driftOptimalTime) = optimalTimes(500, 100)
-    optimalTime should be (119.93759945813207 +- 1e-6)
-    driftOptimalTime should be (119.94149522047802 +- 1e-6)
+    optimalTime should be (119.93759945813207 +- 1e-11)
+    driftOptimalTime should be (119.94149522047802 +- 1e-11)
   }
 }

@@ -17,14 +17,11 @@ class OnePlusLambda(n: Int, lambda: Int) {
       sum += a(i)
       i += 1
     }
-//    if (sum > 1e-9) {
-//      sum /= 1 - (1 - aa) * (1 - bb)
-//      i = 0
-//      while (i < a.length) {
-//        a(i) /= sum
-//        i += 1
-//      }
-//    }
+    i = 0
+    while (i < a.length) {
+      a(i) /= sum
+      i += 1
+    }
   }
 
   private def multiplyByPower(power: Int, unit: Array[Double], result: Array[Double]): Unit = {
