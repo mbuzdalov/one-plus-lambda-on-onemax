@@ -7,8 +7,10 @@ class OnePlusLambda(n: Int, lambda: Int) {
 
   computeEverything()
 
-  private def multiplyInPlace(a: Array[Double], b: Array[Double], norm: Double): Unit = {
-    var aa, bb, sum = 0.0
+  private def multiplyInPlace(a: Array[Double], b: Array[Double], a0: Double, b0: Double): Double = {
+    var aa = a0
+    var bb = b0
+    var sum = 0.0
     var i = 0
     while (i < a.length) {
       aa += a(i)
@@ -17,22 +19,25 @@ class OnePlusLambda(n: Int, lambda: Int) {
       sum += a(i)
       i += 1
     }
-    sum /= norm
+    sum /= 1 - a0 * b0
     i = 0
     while (i < a.length) {
       a(i) /= sum
       i += 1
     }
+    a0 * b0
   }
 
-  private def multiplyByPower(power: Int, unit: Array[Double], result: Array[Double], norm: Double): Unit = {
+  private def multiplyByPower(power: Int, unit: Array[Double], result: Array[Double], unit0: Double, result0: Double): Unit = {
     var p = power
+    var unit00 = unit0
+    var result00 = result0
     while (p > 1) {
-      if ((p & 1) == 1) multiplyInPlace(result, unit, norm)
-      multiplyInPlace(unit, unit, norm)
+      if ((p & 1) == 1) result00 = multiplyInPlace(result, unit, result00, unit00)
+      unit00 = multiplyInPlace(unit, unit, unit00, unit00)
       p >>>= 1
     }
-    if (p == 1) multiplyInPlace(result, unit, norm)
+    if (p == 1) multiplyInPlace(result, unit, result00, unit00)
   }
 
   def optimalTime(d: Int): Double = if (d == 0) 0.0 else optimalTimeCache(d - 1)
@@ -93,13 +98,14 @@ class OnePlusLambda(n: Int, lambda: Int) {
   }
 
   private def compute(d: Int, change: Int): Unit = {
-    val lower = math.max(0, change - n + d)
+    val lower = math.max((change + 1) / 2, change - n + d)
     val upper = math.min(change, d)
     val cnc = logChoose(n, change)
     val prob = Array.tabulate(upper - lower + 1)(okay => math.exp(logChoose(d, okay + lower) + logChoose(n - d, change - okay - lower) - cnc))
     val norm = prob.sum
-    assert(math.abs(norm - 1) < 1e-9, s"prob.sum = ${prob.sum} at n=$n, d=$d, change=$change")
-    multiplyByPower(lambda - 1, prob.clone(), prob, norm)
+    if (1 - norm < 1) { // not the same as norm > 0
+      multiplyByPower(lambda - 1, prob.clone(), prob, 1 - norm, 1 - norm)
+    }
 
     var updateSumOptimal, updateSumDriftOptimal, drift = 0.0
     var updateProb = 0.0
@@ -119,14 +125,8 @@ class OnePlusLambda(n: Int, lambda: Int) {
       i += 1
     }
 
-    if (updateProb < 1e-9) {
-      optimalByStrength(d - 1)(change - 1) = Double.PositiveInfinity
-      driftMaximizingByStrength(d - 1)(change - 1) = Double.PositiveInfinity
-      driftByStrength(d - 1)(change - 1) = 0
-    } else {
-      optimalByStrength(d - 1)(change - 1) = (1 + updateSumOptimal) / updateProb
-      driftMaximizingByStrength(d - 1)(change - 1) = (1 + updateSumDriftOptimal) / updateProb
-      driftByStrength(d - 1)(change - 1) = drift
-    }
+    optimalByStrength(d - 1)(change - 1) = (1 + updateSumOptimal) / updateProb
+    driftMaximizingByStrength(d - 1)(change - 1) = (1 + updateSumDriftOptimal) / updateProb
+    driftByStrength(d - 1)(change - 1) = drift
   }
 }
