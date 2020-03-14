@@ -7,7 +7,7 @@ class OnePlusLambda(n: Int, lambda: Int) {
 
   computeEverything()
 
-  private def multiplyInPlace(a: Array[Double], b: Array[Double]): Unit = {
+  private def multiplyInPlace(a: Array[Double], b: Array[Double], norm: Double): Unit = {
     var aa, bb, sum = 0.0
     var i = 0
     while (i < a.length) {
@@ -17,6 +17,7 @@ class OnePlusLambda(n: Int, lambda: Int) {
       sum += a(i)
       i += 1
     }
+    sum /= norm
     i = 0
     while (i < a.length) {
       a(i) /= sum
@@ -24,14 +25,14 @@ class OnePlusLambda(n: Int, lambda: Int) {
     }
   }
 
-  private def multiplyByPower(power: Int, unit: Array[Double], result: Array[Double]): Unit = {
+  private def multiplyByPower(power: Int, unit: Array[Double], result: Array[Double], norm: Double): Unit = {
     var p = power
     while (p > 1) {
-      if ((p & 1) == 1) multiplyInPlace(result, unit)
-      multiplyInPlace(unit, unit)
+      if ((p & 1) == 1) multiplyInPlace(result, unit, norm)
+      multiplyInPlace(unit, unit, norm)
       p >>>= 1
     }
-    if (p == 1) multiplyInPlace(result, unit)
+    if (p == 1) multiplyInPlace(result, unit, norm)
   }
 
   def optimalTime(d: Int): Double = if (d == 0) 0.0 else optimalTimeCache(d - 1)
@@ -96,8 +97,9 @@ class OnePlusLambda(n: Int, lambda: Int) {
     val upper = math.min(change, d)
     val cnc = logChoose(n, change)
     val prob = Array.tabulate(upper - lower + 1)(okay => math.exp(logChoose(d, okay + lower) + logChoose(n - d, change - okay - lower) - cnc))
-    assert(math.abs(prob.sum - 1) < 1e-9, s"prob.sum = ${prob.sum} at n=$n, d=$d, change=$change")
-    multiplyByPower(lambda - 1, prob.clone(), prob)
+    val norm = prob.sum
+    assert(math.abs(norm - 1) < 1e-9, s"prob.sum = ${prob.sum} at n=$n, d=$d, change=$change")
+    multiplyByPower(lambda - 1, prob.clone(), prob, norm)
 
     var updateSumOptimal, updateSumDriftOptimal, drift = 0.0
     var updateProb = 0.0
