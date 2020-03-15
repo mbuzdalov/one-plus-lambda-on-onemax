@@ -15,7 +15,7 @@ object Main {
     for (n <- 500 to 2000 by 500) {
       for (l <- 1 to 2000) {
         tasks.add(() => {
-          val opl = new OnePlusLambda(n, l)
+          val opl = new OnePlusLambda(n, l, OnePlusLambdaListener.Idle)
           val optimal = opl.optimalExpectedTime
           val driftOptimal = opl.driftOptimalExpectedTime
           out.println(s"$n,$l,$optimal,$driftOptimal,${driftOptimal - optimal},${(driftOptimal - optimal) * l}")
@@ -35,9 +35,15 @@ object Main {
     val tasks = new JArrayList[Callable[Unit]]()
     for (n <- Seq(1000, 2000)) {
       for (lLog <- 0 to 15; l = 1 << lLog) {
+        val logger0 = new LegacyArchivingListener(cache, "%d-%d.gz", n)
+        val logger1 = new ArchivingListener(cache, "%d-%d-new.gz", n)
         tasks.add(() => {
-          val opl = new OnePlusLambda(n, l, Some(cache.resolve(s"$n-$l.gz")))
-          println(s"$n, $l => ${opl.optimalExpectedTime}")
+          try {
+            val opl = new OnePlusLambda(n, l, logger0 ++ logger1)
+            println(s"$n, $l => ${opl.optimalExpectedTime}")
+          } catch {
+            case th: Throwable => th.printStackTrace()
+          }
         })
       }
     }

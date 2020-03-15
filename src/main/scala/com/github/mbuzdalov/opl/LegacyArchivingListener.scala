@@ -46,8 +46,8 @@ class LegacyArchivingListener(rootPath: Path, formatter: String, n: Int) extends
                                        optimalValue: Double, optimalEll: Int,
                                        driftOptimalValue: Double, driftOptimalEll: Int, maximalDrift: Double): Unit = {
     val data = streamMap(lambda)
-    data.optimalTimeCache(d) = optimalValue
-    data.driftMaximizingCache(d) = driftOptimalValue
+    data.optimalTimeCache(d - 1) = optimalValue
+    data.driftMaximizingCache(d - 1) = driftOptimalValue
   }
 
   override def summary(lambda: Int, expectedOptimal: Double, expectedDriftOptimal: Double): Unit = {}

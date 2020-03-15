@@ -1,73 +1,11 @@
 package com.github.mbuzdalov.opl
 
-import java.io.{BufferedReader, BufferedWriter, InputStreamReader, OutputStreamWriter}
-import java.nio.file.{Files, Path}
-import java.util.StringTokenizer
-import java.util.zip.{GZIPInputStream, GZIPOutputStream}
-
-import scala.util.Using
-
-class OnePlusLambda(n: Int, lambda: Int, cacheFileName: Option[Path] = None) {
+class OnePlusLambda(n: Int, lambda: Int, listener: OnePlusLambdaListener) {
   private[this] val logChoose = new MathEx.LogChoose(n)
   private[this] val optimalTimeCache, driftMaximizingCache = Array.fill(n)(Double.NaN)
-  private[this] val optimalByStrength, driftMaximizingByStrength, driftByStrength = Array.fill(n, n)(Double.NaN)
+  private[this] val optimalByStrength, driftMaximizingByStrength, driftByStrength = Array.fill(n)(Double.NaN)
 
-  cacheFileName match {
-    case None =>
-      computeEverything()
-    case Some(file) =>
-      if (Files.exists(file)) {
-        readCachesFromFile(file)
-      } else {
-        computeEverything()
-        writeCachesToFile(file)
-      }
-  }
-
-  private def parseArray(source: String, target: Array[Double]): Unit = {
-    val tok = new StringTokenizer(source)
-    var i = 0
-    while (i < target.length) {
-      target(i) = tok.nextToken().toDouble
-      i += 1
-    }
-  }
-
-  private def readCachesFromFile(file: Path): Unit = {
-    Using.resource(Files.newInputStream(file)) { fileIn =>
-      Using.resource(new GZIPInputStream(fileIn)) { gzipIn =>
-        Using.resource(new InputStreamReader(gzipIn)) { gzipReader =>
-          Using.resource(new BufferedReader(gzipReader)) { br =>
-            val Array(fileN, fileLambda) = br.readLine().split(" ").map(_.toInt)
-            require(fileN == n)
-            require(fileLambda == lambda)
-            parseArray(br.readLine(), optimalTimeCache)
-            parseArray(br.readLine(), driftMaximizingCache)
-            (0 until n).foreach(i => parseArray(br.readLine(), optimalByStrength(i)))
-            (0 until n).foreach(i => parseArray(br.readLine(), driftMaximizingByStrength(i)))
-            (0 until n).foreach(i => parseArray(br.readLine(), driftByStrength(i)))
-          }
-        }
-      }
-    }
-  }
-
-  private def writeCachesToFile(path: Path): Unit = {
-    Using.resource(Files.newOutputStream(path)) { fileOut =>
-      Using.resource(new GZIPOutputStream(fileOut)) { gzipOut =>
-        Using.resource(new OutputStreamWriter(gzipOut)) { gzipWriter =>
-          Using.resource(new BufferedWriter(gzipWriter)) { bw =>
-            bw.write(s"$n $lambda\n")
-            bw.write(optimalTimeCache.mkString("", " ", "\n"))
-            bw.write(driftMaximizingCache.mkString("", " ", "\n"))
-            (0 until n).foreach(i => bw.write(optimalByStrength(i).mkString("", " ", "\n")))
-            (0 until n).foreach(i => bw.write(driftMaximizingByStrength(i).mkString("", " ", "\n")))
-            (0 until n).foreach(i => bw.write(driftByStrength(i).mkString("", " ", "\n")))
-          }
-        }
-      }
-    }
-  }
+  computeEverything()
 
   private def multiplyByPower(power: Int, unit: ProbabilityVector, result: ProbabilityVector): Unit = {
     var p = power
@@ -93,38 +31,26 @@ class OnePlusLambda(n: Int, lambda: Int, cacheFileName: Option[Path] = None) {
     (0 to n).map(d => driftOptimalTime(d) * math.exp(logChoose(n, d) - logAll)).sum
   }
 
-  def optimalTime(d: Int, l: Int): Double =
-    if (d == 0)
-      0.0
-    else if (l == 0)
-      Double.PositiveInfinity
-    else
-      optimalByStrength(d - 1)(l - 1)
-
-  def drift(d: Int, l: Int): Double =
-    if (d == 0 || l == 0)
-      0.0
-    else
-      driftByStrength(d - 1)(l - 1)
-
-  def driftOptimalTime(d: Int, l: Int): Double =
-    if (d == 0)
-      0.0
-    else if (l == 0)
-      Double.PositiveInfinity
-    else
-      driftMaximizingByStrength(d - 1)(l - 1)
-
   private def computeEverything(): Unit = {
+    listener.startComputing(Seq(lambda))
     for (d <- 1 to n) {
+      listener.startComputingDistance(lambda, d)
       var bestDriftValue = -1.0
       var bestDriftIndex = -1
       var minOptimal = Double.PositiveInfinity
+      var minIndex = -1
       var change = 1
       while (change <= n) {
         compute(d, change)
-        minOptimal = math.min(minOptimal, optimalByStrength(d - 1)(change - 1))
-        val driftValue = driftByStrength(d - 1)(change - 1)
+        listener.distanceEllComputed(lambda, d, change,
+                                     optimalByStrength(change - 1), driftByStrength(change - 1),
+                                     driftMaximizingByStrength(change - 1))
+        if (minOptimal > optimalByStrength(change - 1)) {
+          minOptimal = optimalByStrength(change - 1)
+          minIndex = change
+        }
+        minOptimal = math.min(minOptimal, optimalByStrength(change - 1))
+        val driftValue = driftByStrength(change - 1)
         if (bestDriftValue < driftValue) {
           bestDriftValue = driftValue
           bestDriftIndex = change
@@ -132,8 +58,16 @@ class OnePlusLambda(n: Int, lambda: Int, cacheFileName: Option[Path] = None) {
         change += 1
       }
       optimalTimeCache(d - 1) = minOptimal
-      driftMaximizingCache(d - 1) = driftMaximizingByStrength(d - 1)(bestDriftIndex - 1)
+      driftMaximizingCache(d - 1) = driftMaximizingByStrength(bestDriftIndex - 1)
+      listener.finishComputingDistance(lambda, d, minOptimal, minIndex,
+                                       driftMaximizingByStrength(bestDriftIndex - 1), bestDriftIndex, bestDriftValue)
     }
+    val logAll = math.log(2) * n
+
+    listener.summary(lambda = lambda,
+                     expectedOptimal = (0 to n).map(d => optimalTime(d) * math.exp(logChoose(n, d) - logAll)).sum,
+                     expectedDriftOptimal = (0 to n).map(d => driftOptimalTime(d) * math.exp(logChoose(n, d) - logAll)).sum)
+    listener.finishComputing()
   }
 
   private def compute(d: Int, change: Int): Unit = {
@@ -165,8 +99,8 @@ class OnePlusLambda(n: Int, lambda: Int, cacheFileName: Option[Path] = None) {
       i += 1
     }
 
-    optimalByStrength(d - 1)(change - 1) = (1 + updateSumOptimal) / updateProb
-    driftMaximizingByStrength(d - 1)(change - 1) = (1 + updateSumDriftOptimal) / updateProb
-    driftByStrength(d - 1)(change - 1) = drift
+    optimalByStrength(change - 1) = (1 + updateSumOptimal) / updateProb
+    driftMaximizingByStrength(change - 1) = (1 + updateSumDriftOptimal) / updateProb
+    driftByStrength(change - 1) = drift
   }
 }
