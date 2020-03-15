@@ -69,37 +69,14 @@ class OnePlusLambda(n: Int, lambda: Int, cacheFileName: Option[Path] = None) {
     }
   }
 
-  private def multiplyInPlace(a: Array[Double], b: Array[Double], a0: Double, b0: Double): Double = {
-    var aa = a0
-    var bb = b0
-    var sum = 0.0
-    var i = 0
-    while (i < a.length) {
-      aa += a(i)
-      bb += b(i)
-      a(i) = aa * b(i) + bb * a(i) - a(i) * b(i)
-      sum += a(i)
-      i += 1
-    }
-    sum /= 1 - a0 * b0
-    i = 0
-    while (i < a.length) {
-      a(i) /= sum
-      i += 1
-    }
-    a0 * b0
-  }
-
-  private def multiplyByPower(power: Int, unit: Array[Double], result: Array[Double], unit0: Double, result0: Double): Unit = {
+  private def multiplyByPower(power: Int, unit: ProbabilityVector, result: ProbabilityVector): Unit = {
     var p = power
-    var unit00 = unit0
-    var result00 = result0
     while (p > 1) {
-      if ((p & 1) == 1) result00 = multiplyInPlace(result, unit, result00, unit00)
-      unit00 = multiplyInPlace(unit, unit, unit00, unit00)
+      if ((p & 1) == 1) result *= unit
+      unit *= unit
       p >>>= 1
     }
-    if (p == 1) multiplyInPlace(result, unit, result00, unit00)
+    if (p == 1) result *= unit
   }
 
   def optimalTime(d: Int): Double = if (d == 0) 0.0 else optimalTimeCache(d - 1)
@@ -163,19 +140,20 @@ class OnePlusLambda(n: Int, lambda: Int, cacheFileName: Option[Path] = None) {
     val lower = math.max((change + 1) / 2, change - n + d)
     val upper = math.min(change, d)
     val cnc = logChoose(n, change)
-    val prob = Array.tabulate(upper - lower + 1)(okay => math.exp(logChoose(d, okay + lower) + logChoose(n - d, change - okay - lower) - cnc))
-    val norm = prob.sum
-    if (1 - norm < 1) { // not the same as norm > 0
-      multiplyByPower(lambda - 1, prob.clone(), prob, 1 - norm, 1 - norm)
+    val prob = new ProbabilityVector(upper - lower + 1)
+    for (okay <- 0 to upper - lower) prob.set(okay, math.exp(logChoose(d, okay + lower) + logChoose(n - d, change - okay - lower) - cnc))
+    prob.setPreDataByArray()
+    if (prob.getPreData < 1) {
+      multiplyByPower(lambda - 1, new ProbabilityVector(prob), prob)
     }
 
     var updateSumOptimal, updateSumDriftOptimal, drift = 0.0
     var updateProb = 0.0
     var i = 0
-    while (i < prob.length) {
+    while (i < prob.size) {
       val okay = lower + i
       val newD = d - 2 * okay + change
-      val pi = prob(i)
+      val pi = prob.get(i)
       if (newD < d) {
         updateProb += pi
         if (newD > 0) {
