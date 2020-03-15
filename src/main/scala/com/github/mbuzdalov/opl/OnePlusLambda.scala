@@ -17,20 +17,6 @@ class OnePlusLambda(n: Int, lambda: Int, listener: OnePlusLambdaListener) {
     if (p == 1) result *= unit
   }
 
-  def optimalTime(d: Int): Double = if (d == 0) 0.0 else optimalTimeCache(d - 1)
-
-  def optimalExpectedTime: Double = {
-    val logAll = math.log(2) * n
-    (0 to n).map(d => optimalTime(d) * math.exp(logChoose(n, d) - logAll)).sum
-  }
-
-  def driftOptimalTime(d: Int): Double = if (d == 0) 0.0 else driftMaximizingCache(d - 1)
-
-  def driftOptimalExpectedTime: Double = {
-    val logAll = math.log(2) * n
-    (0 to n).map(d => driftOptimalTime(d) * math.exp(logChoose(n, d) - logAll)).sum
-  }
-
   private def computeEverything(): Unit = {
     listener.startComputing(Seq(lambda))
     for (d <- 1 to n) {
@@ -65,8 +51,8 @@ class OnePlusLambda(n: Int, lambda: Int, listener: OnePlusLambdaListener) {
     val logAll = math.log(2) * n
 
     listener.summary(lambda = lambda,
-                     expectedOptimal = (0 to n).map(d => optimalTime(d) * math.exp(logChoose(n, d) - logAll)).sum,
-                     expectedDriftOptimal = (0 to n).map(d => driftOptimalTime(d) * math.exp(logChoose(n, d) - logAll)).sum)
+                     expectedOptimal = (1 to n).map(d => optimalTimeCache(d - 1) * math.exp(logChoose(n, d) - logAll)).sum,
+                     expectedDriftOptimal = (1 to n).map(d => driftMaximizingCache(d - 1) * math.exp(logChoose(n, d) - logAll)).sum)
     listener.finishComputing()
   }
 

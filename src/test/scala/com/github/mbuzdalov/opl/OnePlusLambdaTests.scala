@@ -5,10 +5,9 @@ import org.scalatest.matchers.should.Matchers
 
 class OnePlusLambdaTests extends AnyFlatSpec with Matchers {
   private def optimalTimes(n: Int, lambda: Int): (Double, Double) = {
-    val opl = new OnePlusLambda(n, lambda, OnePlusLambdaListener.Idle)
-    val optimalTime = opl.optimalExpectedTime
-    val driftOptimalTime = opl.driftOptimalExpectedTime
-    (optimalTime, driftOptimalTime)
+    val listener = new SummaryOnlyListener
+    new OnePlusLambda(n, lambda, listener)
+    (listener.expectedOptimalTime, listener.expectedDriftOptimalTime)
   }
 
   "RLS time" should "be right for n=500" in {

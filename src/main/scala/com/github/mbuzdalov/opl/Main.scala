@@ -15,9 +15,10 @@ object Main {
     for (n <- 500 to 2000 by 500) {
       for (l <- 1 to 2000) {
         tasks.add(() => {
-          val opl = new OnePlusLambda(n, l, OnePlusLambdaListener.Idle)
-          val optimal = opl.optimalExpectedTime
-          val driftOptimal = opl.driftOptimalExpectedTime
+          val summary = new SummaryOnlyListener
+          new OnePlusLambda(n, l, summary)
+          val optimal = summary.expectedOptimalTime
+          val driftOptimal = summary.expectedDriftOptimalTime
           out.println(s"$n,$l,$optimal,$driftOptimal,${driftOptimal - optimal},${(driftOptimal - optimal) * l}")
         })
       }
@@ -39,8 +40,9 @@ object Main {
         val logger1 = new ArchivingListener(cache, "%d-%d-new.gz", n)
         tasks.add(() => {
           try {
-            val opl = new OnePlusLambda(n, l, logger0 ++ logger1)
-            println(s"$n, $l => ${opl.optimalExpectedTime}")
+            val summary = new SummaryOnlyListener
+            new OnePlusLambda(n, l, logger0 ++ logger1 ++ summary)
+            println(s"$n, $l => ${summary.expectedOptimalTime}")
           } catch {
             case th: Throwable => th.printStackTrace()
           }
