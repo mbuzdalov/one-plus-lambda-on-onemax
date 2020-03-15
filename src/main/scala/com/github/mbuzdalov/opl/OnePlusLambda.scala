@@ -59,30 +59,34 @@ class OnePlusLambda(n: Int, lambda: Int, listener: OnePlusLambdaListener) {
   private def compute(d: Int, change: Int): Unit = {
     val lower = math.max((change + 1) / 2, change - n + d)
     val upper = math.min(change, d)
-    val cnc = logChoose(n, change)
-    val prob = new ProbabilityVector(upper - lower + 1)
-    for (okay <- 0 to upper - lower) prob.set(okay, math.exp(logChoose(d, okay + lower) + logChoose(n - d, change - okay - lower) - cnc))
-    prob.setPreDataByArray()
-    if (prob.getPreData < 1) {
-      multiplyByPower(lambda - 1, new ProbabilityVector(prob), prob)
-    }
-
     var updateSumOptimal, updateSumDriftOptimal, drift = 0.0
     var updateProb = 0.0
-    var i = 0
-    while (i < prob.size) {
-      val okay = lower + i
-      val newD = d - 2 * okay + change
-      val pi = prob.get(i)
-      if (newD < d) {
-        updateProb += pi
-        if (newD > 0) {
-          updateSumOptimal += optimalTimeCache(newD - 1) * pi
-          updateSumDriftOptimal += driftMaximizingCache(newD - 1) * pi
+
+    if (upper >= lower) {
+      val cnc = logChoose(n, change)
+      val unit, prob = new ProbabilityVector(upper - lower + 1)
+      for (okay <- 0 to upper - lower)
+        unit.set(okay, math.exp(logChoose(d, okay + lower) + logChoose(n - d, change - okay - lower) - cnc))
+      unit.setPreDataByArray()
+      prob.setPreDataByArray()
+      if (unit.getPreData < 1)
+        multiplyByPower(lambda, unit, prob)
+
+      var i = 0
+      while (i < prob.size) {
+        val okay = lower + i
+        val newD = d - 2 * okay + change
+        val pi = prob.get(i)
+        if (newD < d) {
+          updateProb += pi
+          if (newD > 0) {
+            updateSumOptimal += optimalTimeCache(newD - 1) * pi
+            updateSumDriftOptimal += driftMaximizingCache(newD - 1) * pi
+          }
+          drift += (d - newD) * pi
         }
-        drift += (d - newD) * pi
+        i += 1
       }
-      i += 1
     }
 
     optimalByStrength(change - 1) = (1 + updateSumOptimal) / updateProb

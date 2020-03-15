@@ -1,14 +1,8 @@
 package com.github.mbuzdalov.opl
 
 class ProbabilityVector(val size: Int) {
-  private[this] val data = new Array[Double](math.max(0, size))
+  private[this] val data = new Array[Double](size)
   private[this] var preDataProbability = 0.0
-
-  def this(base: ProbabilityVector) {
-    this(base.size)
-    System.arraycopy(base.getData, 0, data, 0, data.length)
-    preDataProbability = base.getPreData
-  }
 
   private def getData: Array[Double] = data
 
