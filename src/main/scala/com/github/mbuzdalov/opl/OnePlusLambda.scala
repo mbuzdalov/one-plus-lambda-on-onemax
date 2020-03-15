@@ -1,11 +1,73 @@
 package com.github.mbuzdalov.opl
 
-class OnePlusLambda(n: Int, lambda: Int) {
+import java.io.{BufferedReader, BufferedWriter, InputStreamReader, OutputStreamWriter}
+import java.nio.file.{Files, Path}
+import java.util.StringTokenizer
+import java.util.zip.{GZIPInputStream, GZIPOutputStream}
+
+import scala.util.Using
+
+class OnePlusLambda(n: Int, lambda: Int, cacheFileName: Option[Path] = None) {
   private[this] val logChoose = new MathEx.LogChoose(n)
   private[this] val optimalTimeCache, driftMaximizingCache = Array.fill(n)(Double.NaN)
   private[this] val optimalByStrength, driftMaximizingByStrength, driftByStrength = Array.fill(n, n)(Double.NaN)
 
-  computeEverything()
+  cacheFileName match {
+    case None =>
+      computeEverything()
+    case Some(file) =>
+      if (Files.exists(file)) {
+        readCachesFromFile(file)
+      } else {
+        computeEverything()
+        writeCachesToFile(file)
+      }
+  }
+
+  private def parseArray(source: String, target: Array[Double]): Unit = {
+    val tok = new StringTokenizer(source)
+    var i = 0
+    while (i < target.length) {
+      target(i) = tok.nextToken().toDouble
+      i += 1
+    }
+  }
+
+  private def readCachesFromFile(file: Path): Unit = {
+    Using.resource(Files.newInputStream(file)) { fileIn =>
+      Using.resource(new GZIPInputStream(fileIn)) { gzipIn =>
+        Using.resource(new InputStreamReader(gzipIn)) { gzipReader =>
+          Using.resource(new BufferedReader(gzipReader)) { br =>
+            val Array(fileN, fileLambda) = br.readLine().split(" ").map(_.toInt)
+            require(fileN == n)
+            require(fileLambda == lambda)
+            parseArray(br.readLine(), optimalTimeCache)
+            parseArray(br.readLine(), driftMaximizingCache)
+            (0 until n).foreach(i => parseArray(br.readLine(), optimalByStrength(i)))
+            (0 until n).foreach(i => parseArray(br.readLine(), driftMaximizingByStrength(i)))
+            (0 until n).foreach(i => parseArray(br.readLine(), driftByStrength(i)))
+          }
+        }
+      }
+    }
+  }
+
+  private def writeCachesToFile(path: Path): Unit = {
+    Using.resource(Files.newOutputStream(path)) { fileOut =>
+      Using.resource(new GZIPOutputStream(fileOut)) { gzipOut =>
+        Using.resource(new OutputStreamWriter(gzipOut)) { gzipWriter =>
+          Using.resource(new BufferedWriter(gzipWriter)) { bw =>
+            bw.write(s"$n $lambda\n")
+            bw.write(optimalTimeCache.mkString("", " ", "\n"))
+            bw.write(driftMaximizingCache.mkString("", " ", "\n"))
+            (0 until n).foreach(i => bw.write(optimalByStrength(i).mkString("", " ", "\n")))
+            (0 until n).foreach(i => bw.write(driftMaximizingByStrength(i).mkString("", " ", "\n")))
+            (0 until n).foreach(i => bw.write(driftByStrength(i).mkString("", " ", "\n")))
+          }
+        }
+      }
+    }
+  }
 
   private def multiplyInPlace(a: Array[Double], b: Array[Double], a0: Double, b0: Double): Double = {
     var aa = a0
