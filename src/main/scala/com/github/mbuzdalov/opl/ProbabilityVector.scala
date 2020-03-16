@@ -2,14 +2,21 @@ package com.github.mbuzdalov.opl
 
 class ProbabilityVector(val size: Int) {
   private[this] val data = new Array[Double](size)
-  private[this] var preDataProbability = 0.0
+  private[this] var preDataProbability = 1.0
 
   private def getData: Array[Double] = data
 
   def get(index: Int): Double = data(index)
   def set(index: Int, value: Double): Unit = data(index) = value
 
-  def setPreDataByArray(): Unit = preDataProbability = 1 - data.sum
+  def setPreDataByArray(): Unit = {
+    preDataProbability = 1.0
+    var i = data.length
+    while (i > 0) {
+      i -= 1
+      preDataProbability -= data(i)
+    }
+  }
 
   def getPreData: Double = preDataProbability
   def setPreData(value: Double): Unit = preDataProbability = value

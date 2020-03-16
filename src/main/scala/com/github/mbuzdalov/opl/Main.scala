@@ -34,18 +34,13 @@ object Main {
   def powersOfTwo(cacheDirectoryName: String, processors: Int): Unit = {
     val cache = Paths.get(cacheDirectoryName)
     val tasks = new JArrayList[Callable[Unit]]()
-    for (n <- Seq(1000, 2000)) {
+    for (n <- Seq(1000, 2000, 10000)) {
       for (lLog <- 0 to 15; l = 1 << lLog) {
-        val logger0 = new LegacyArchivingListener(cache, "%d-%d.gz", n)
-        val logger1 = new ArchivingListener(cache, "%d-%d-new.gz", n)
+        val archive = new ArchivingListener(cache, "%d-%d.gz", n)
         tasks.add(() => {
-          try {
-            val summary = new SummaryOnlyListener
-            new OnePlusLambda(n, l, logger0 ++ logger1 ++ summary)
-            println(s"$n, $l => ${summary.expectedOptimalTime}")
-          } catch {
-            case th: Throwable => th.printStackTrace()
-          }
+          val summary = new SummaryOnlyListener
+          new OnePlusLambda(n, l, archive ++ summary)
+          println(s"$n, $l => ${summary.expectedOptimalTime}")
         })
       }
     }

@@ -65,10 +65,13 @@ class OnePlusLambda(n: Int, lambda: Int, listener: OnePlusLambdaListener) {
     if (upper >= lower) {
       val cnc = logChoose(n, change)
       val unit, prob = new ProbabilityVector(upper - lower + 1)
-      for (okay <- 0 to upper - lower)
+      var okay = 0
+      while (okay <= upper - lower) {
         unit.set(okay, math.exp(logChoose(d, okay + lower) + logChoose(n - d, change - okay - lower) - cnc))
+        okay += 1
+      }
+
       unit.setPreDataByArray()
-      prob.setPreDataByArray()
       if (unit.getPreData < 1)
         multiplyByPower(lambda, unit, prob)
 
