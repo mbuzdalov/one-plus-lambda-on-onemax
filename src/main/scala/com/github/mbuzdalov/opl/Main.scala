@@ -36,7 +36,7 @@ object Main {
     val tasks = new JArrayList[Callable[Unit]]()
     for (n <- Seq(1000, 2000, 10000)) {
       for (lLog <- 0 to 15; l = 1 << lLog) {
-        val archive = new ArchivingListener(cache, "%d-%d.gz", n)
+        val archive = new DeflatingListener(cache, "%d-%d.gz", n)
         tasks.add(() => {
           val summary = new SummaryOnlyListener
           new OnePlusLambda(n, l, archive ++ summary)

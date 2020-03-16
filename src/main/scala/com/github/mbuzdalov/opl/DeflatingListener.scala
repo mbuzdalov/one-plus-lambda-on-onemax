@@ -6,7 +6,7 @@ import java.util.zip.GZIPOutputStream
 
 import scala.collection.mutable
 
-class ArchivingListener(rootPath: Path, formatter: String, n: Int) extends OnePlusLambdaListener {
+class DeflatingListener(rootPath: Path, formatter: String, n: Int) extends OnePlusLambdaListener {
   private[this] val streamMap = new mutable.HashMap[Int, DataOutputStream]()
 
   override def startComputing(lambdas: Seq[Int]): Unit = {
