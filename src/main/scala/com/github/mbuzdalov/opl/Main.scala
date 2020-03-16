@@ -1,7 +1,7 @@
 package com.github.mbuzdalov.opl
 
 import java.io.PrintWriter
-import java.nio.file.Paths
+import java.nio.file.{Files, Paths}
 import java.util.concurrent.{Callable, Executors}
 import java.util.{ArrayList => JArrayList}
 
@@ -31,7 +31,7 @@ object Main {
     out.close()
   }
 
-  def powersOfTwo(cacheDirectoryName: String, processors: Int): Unit = {
+  def populatePowersOfTwo(cacheDirectoryName: String, processors: Int): Unit = {
     val cache = Paths.get(cacheDirectoryName)
     val tasks = new JArrayList[Callable[Unit]]()
     for (n <- Seq(1000, 2000, 10000)) {
@@ -51,10 +51,28 @@ object Main {
     pool.shutdown()
   }
 
+  def buildReport(cacheDirectoryName: String, resultDirectoryName: String): Unit = {
+    val cache = Paths.get(cacheDirectoryName)
+    val results = Paths.get(resultDirectoryName)
+    for (n <- Seq(1000, 2000, 10000)) {
+      for (lLog <- 0 to 15; l = 1 << lLog) {
+        val archive = cache.resolve(s"$n-$l.gz")
+        if (Files.exists(archive)) {
+          val pictureListener = new EllPictureBuildingListener(results.resolve(s"ell-$n-$l.png"))
+          Inflater.apply(n, l, archive, pictureListener)
+          println(s"$archive processed")
+        } else {
+          println(s"Warning: could not find $archive")
+        }
+      }
+    }
+  }
+
   def main(args: Array[String]): Unit = {
     args(0) match {
       case "drift-non-optimal" => driftNonOptimal(args(1))
-      case "powers-of-two-populate" => powersOfTwo(args(1), args(2).toInt)
+      case "powers-of-two-populate" => populatePowersOfTwo(args(1), args(2).toInt)
+      case "build-report" => buildReport(args(1), args(2))
       case other => println(s"Command '$other' not recognized'")
     }
   }
