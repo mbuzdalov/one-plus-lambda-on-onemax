@@ -3,7 +3,7 @@ package com.github.mbuzdalov.opl
 class OnePlusLambda(n: Int, lambda: Int, listener: OnePlusLambdaListener) {
   private[this] val logChoose = new MathEx.LogChoose(n)
   private[this] val optimalTimeCache, driftMaximizingCache = Array.fill(n)(Double.NaN)
-  private[this] val optimalByStrength, driftMaximizingByStrength, driftByStrength = Array.fill(n)(Double.NaN)
+  private[this] val driftMaximizingByStrength = Array.fill(n)(Double.NaN)
 
   computeEverything()
 
@@ -27,16 +27,11 @@ class OnePlusLambda(n: Int, lambda: Int, listener: OnePlusLambdaListener) {
       var minIndex = -1
       var change = 1
       while (change <= n) {
-        compute(d, change)
-        listener.distanceEllComputed(d, change,
-                                     optimalByStrength(change - 1), driftByStrength(change - 1),
-                                     driftMaximizingByStrength(change - 1))
-        if (minOptimal > optimalByStrength(change - 1)) {
-          minOptimal = optimalByStrength(change - 1)
+        val (currMin, driftValue) = compute(d, change)
+        if (minOptimal > currMin) {
+          minOptimal = currMin
           minIndex = change
         }
-        minOptimal = math.min(minOptimal, optimalByStrength(change - 1))
-        val driftValue = driftByStrength(change - 1)
         if (bestDriftValue < driftValue) {
           bestDriftValue = driftValue
           bestDriftIndex = change
@@ -56,7 +51,7 @@ class OnePlusLambda(n: Int, lambda: Int, listener: OnePlusLambdaListener) {
     )
   }
 
-  private def compute(d: Int, change: Int): Unit = {
+  private def compute(d: Int, change: Int): (Double, Double) = {
     val lower = math.max((change + 1) / 2, change - n + d)
     val upper = math.min(change, d)
     var updateSumOptimal, updateSumDriftOptimal, drift = 0.0
@@ -92,8 +87,11 @@ class OnePlusLambda(n: Int, lambda: Int, listener: OnePlusLambdaListener) {
       }
     }
 
-    optimalByStrength(change - 1) = (1 + updateSumOptimal) / updateProb
     driftMaximizingByStrength(change - 1) = (1 + updateSumDriftOptimal) / updateProb
-    driftByStrength(change - 1) = drift
+    listener.distanceEllComputed(d, change,
+                                 updateProb, 1 + updateSumOptimal,
+                                 drift, 1 + updateSumDriftOptimal)
+
+    ((1 + updateSumOptimal) / updateProb, drift)
   }
 }

@@ -14,11 +14,12 @@ class DeflatingListener(target: Path) extends OnePlusLambdaListener {
   override def startComputingDistance(d: Int): Unit = {}
 
   override def distanceEllComputed(d: Int, ell: Int,
-                                   optimal: Double, drift: Double, driftOptimal: Double): Unit = {
-    data.writeInt(ell)
-    data.writeDouble(optimal)
+                                   updateProbability: Double, optimalConditioned: Double,
+                                   drift: Double, driftOptimalConditioned: Double): Unit = {
+    data.writeDouble(updateProbability)
+    data.writeDouble(optimalConditioned)
     data.writeDouble(drift)
-    data.writeDouble(driftOptimal)
+    data.writeDouble(driftOptimalConditioned)
   }
 
   override def finishComputingDistance(d: Int,

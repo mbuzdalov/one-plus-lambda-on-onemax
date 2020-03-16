@@ -19,18 +19,19 @@ class EllPictureBuildingListener(target: Path) extends OnePlusLambdaListener {
   override def startComputingDistance(d: Int): Unit =
     java.util.Arrays.fill(currentValues, Double.NaN)
 
-  override def distanceEllComputed(d: Int, ell: Int, optimal: Double, drift: Double, driftOptimal: Double): Unit =
+  override def distanceEllComputed(d: Int, ell: Int,
+                                   updateProbability: Double, optimalConditioned: Double,
+                                   drift: Double, driftOptimalConditioned: Double): Unit =
     if (ell <= currentValues.length)
-      currentValues(ell - 1) = optimal
+      currentValues(ell - 1) = optimalConditioned / updateProbability
 
   override def finishComputingDistance(d: Int,
                                        optimalValue: Double, optimalEll: Int,
                                        driftOptimalValue: Double, driftOptimalEll: Int, maximalDrift: Double): Unit =
     if (d <= currentValues.length) {
-      val minimum = currentValues.min
       for (l <- currentValues.indices) {
         val lineValue = currentValues(l)
-        val effValue = math.exp(minimum - lineValue)
+        val effValue = math.exp(optimalValue - lineValue)
         val pos = (effValue * 255).toInt
         val neg = ((1 - effValue) * 255).toInt
         currentImage.setRGB(d - 1, currentValues.length - l - 1, (pos << 16) ^ neg)

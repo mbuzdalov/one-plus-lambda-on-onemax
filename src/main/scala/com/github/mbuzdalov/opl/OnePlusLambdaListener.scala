@@ -3,7 +3,9 @@ package com.github.mbuzdalov.opl
 trait OnePlusLambdaListener {
   def startComputing(n: Int, lambda: Int): Unit
   def startComputingDistance(d: Int): Unit
-  def distanceEllComputed(d: Int, ell: Int, optimal: Double, drift: Double, driftOptimal: Double): Unit
+  def distanceEllComputed(d: Int, ell: Int,
+                          updateProbability: Double, optimalConditioned: Double,
+                          drift: Double, driftOptimalConditioned: Double): Unit
   def finishComputingDistance(d: Int,
                               optimalValue: Double, optimalEll: Int,
                               driftOptimalValue: Double, driftOptimalEll: Int, maximalDrift: Double): Unit
@@ -17,7 +19,8 @@ object OnePlusLambdaListener {
     override def startComputing(n: Int, lambda: Int): Unit = {}
     override def startComputingDistance(d: Int): Unit = {}
     override def distanceEllComputed(d: Int, ell: Int,
-                                     optimal: Double, drift: Double, driftOptimal: Double): Unit = {}
+                                     updateProbability: Double, optimalConditioned: Double,
+                                     drift: Double, driftOptimalConditioned: Double): Unit = {}
 
     override def finishComputingDistance(d: Int,
                                          optimalValue: Double, optimalEll: Int,
@@ -37,8 +40,9 @@ object OnePlusLambdaListener {
     override def startComputingDistance(d: Int): Unit = all.foreach(_.startComputingDistance(d))
 
     override def distanceEllComputed(d: Int, ell: Int,
-                                     optimal: Double, drift: Double, driftOptimal: Double): Unit =
-      all.foreach(_.distanceEllComputed(d, ell, optimal, drift, driftOptimal))
+                                     updateProbability: Double, optimalConditioned: Double,
+                                     drift: Double, driftOptimalConditioned: Double): Unit =
+      all.foreach(_.distanceEllComputed(d, ell, updateProbability, optimalConditioned, drift, driftOptimalConditioned))
 
     override def finishComputingDistance(d: Int,
                                          optimalValue: Double, optimalEll: Int,

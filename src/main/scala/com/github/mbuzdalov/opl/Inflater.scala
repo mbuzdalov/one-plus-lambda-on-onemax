@@ -14,8 +14,8 @@ object Inflater {
           listener.startComputing(n, lambda)
           for (d <- 1 to n) {
             listener.startComputingDistance(d)
-            for (_ <- 1 to n) {
-              listener.distanceEllComputed(d, data.readInt(), data.readDouble(), data.readDouble(), data.readDouble())
+            for (ell <- 1 to n) {
+              listener.distanceEllComputed(d, ell, data.readDouble(), data.readDouble(), data.readDouble(), data.readDouble())
             }
             listener.finishComputingDistance(d, data.readDouble(), data.readInt(), data.readDouble(), data.readInt(), data.readDouble())
           }
