@@ -19,8 +19,7 @@ object Inflater {
             }
             listener.finishComputingDistance(d, data.readDouble(), data.readInt(), data.readDouble(), data.readInt(), data.readDouble())
           }
-          listener.summary(data.readDouble(), data.readDouble())
-          listener.finishComputing()
+          listener.finishComputing(data.readDouble(), data.readDouble())
         }
       }
     }

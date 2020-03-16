@@ -7,8 +7,7 @@ trait OnePlusLambdaListener {
   def finishComputingDistance(d: Int,
                               optimalValue: Double, optimalEll: Int,
                               driftOptimalValue: Double, driftOptimalEll: Int, maximalDrift: Double): Unit
-  def summary(expectedOptimal: Double, expectedDriftOptimal: Double): Unit
-  def finishComputing(): Unit
+  def finishComputing(expectedOptimal: Double, expectedDriftOptimal: Double): Unit
 
   def ++ (that: OnePlusLambdaListener): OnePlusLambdaListener = new OnePlusLambdaListener.Composer(that :: this :: Nil)
 }
@@ -23,8 +22,7 @@ object OnePlusLambdaListener {
     override def finishComputingDistance(d: Int,
                                          optimalValue: Double, optimalEll: Int,
                                          driftOptimalValue: Double, driftOptimalEll: Int, maximalDrift: Double): Unit = {}
-    override def summary(expectedOptimal: Double, expectedDriftOptimal: Double): Unit = {}
-    override def finishComputing(): Unit = {}
+    override def finishComputing(expectedOptimal: Double, expectedDriftOptimal: Double): Unit = {}
   }
 
   object Idle extends Adapter
@@ -48,9 +46,7 @@ object OnePlusLambdaListener {
       all.foreach(_.finishComputingDistance(d, optimalValue, optimalEll,
                                             driftOptimalValue, driftOptimalEll, maximalDrift))
 
-    override def summary(expectedOptimal: Double, expectedDriftOptimal: Double): Unit =
-      all.foreach(_.summary(expectedOptimal, expectedDriftOptimal))
-
-    override def finishComputing(): Unit = all.foreach(_.finishComputing())
+    override def finishComputing(expectedOptimal: Double, expectedDriftOptimal: Double): Unit =
+      all.foreach(_.finishComputing(expectedOptimal, expectedDriftOptimal))
   }
 }

@@ -31,12 +31,9 @@ class DeflatingListener(target: Path) extends OnePlusLambdaListener {
     data.writeDouble(maximalDrift)
   }
 
-  override def summary(expectedOptimal: Double, expectedDriftOptimal: Double): Unit = {
+  override def finishComputing(expectedOptimal: Double, expectedDriftOptimal: Double): Unit = {
     data.writeDouble(expectedOptimal)
     data.writeDouble(expectedDriftOptimal)
-  }
-
-  override def finishComputing(): Unit = {
     data.close()
     data = null
   }

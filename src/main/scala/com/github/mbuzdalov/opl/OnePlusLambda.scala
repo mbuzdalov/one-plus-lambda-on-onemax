@@ -50,9 +50,10 @@ class OnePlusLambda(n: Int, lambda: Int, listener: OnePlusLambdaListener) {
     }
     val logAll = math.log(2) * n
 
-    listener.summary(expectedOptimal = (1 to n).map(d => optimalTimeCache(d - 1) * math.exp(logChoose(n, d) - logAll)).sum,
-                     expectedDriftOptimal = (1 to n).map(d => driftMaximizingCache(d - 1) * math.exp(logChoose(n, d) - logAll)).sum)
-    listener.finishComputing()
+    listener.finishComputing(
+      expectedOptimal = (1 to n).map(d => optimalTimeCache(d - 1) * math.exp(logChoose(n, d) - logAll)).sum,
+      expectedDriftOptimal = (1 to n).map(d => driftMaximizingCache(d - 1) * math.exp(logChoose(n, d) - logAll)).sum
+    )
   }
 
   private def compute(d: Int, change: Int): Unit = {
