@@ -11,15 +11,15 @@ object Inflater {
     Using.resource(Files.newInputStream(file)) { inStream =>
       Using.resource(new GZIPInputStream(inStream)) { gzipStream =>
         Using.resource(new DataInputStream(gzipStream)) { data =>
-          listener.startComputing(Seq(lambda))
+          listener.startComputing(n, lambda)
           for (d <- 1 to n) {
-            listener.startComputingDistance(lambda, d)
+            listener.startComputingDistance(d)
             for (_ <- 1 to n) {
-              listener.distanceEllComputed(lambda, d, data.readInt(), data.readDouble(), data.readDouble(), data.readDouble())
+              listener.distanceEllComputed(d, data.readInt(), data.readDouble(), data.readDouble(), data.readDouble())
             }
-            listener.finishComputingDistance(lambda, d, data.readDouble(), data.readInt(), data.readDouble(), data.readInt(), data.readDouble())
+            listener.finishComputingDistance(d, data.readDouble(), data.readInt(), data.readDouble(), data.readInt(), data.readDouble())
           }
-          listener.summary(lambda, data.readDouble(), data.readDouble())
+          listener.summary(data.readDouble(), data.readDouble())
           listener.finishComputing()
         }
       }

@@ -37,14 +37,12 @@ class OnePlusLambdaTests extends AnyFlatSpec with Matchers {
   }
 
   "Deflation and inflation" should "work" in {
-    val tempDir = Files.createTempDirectory("opl-temp")
-    val tempFile = tempDir.resolve("500-1.gz")
-    new OnePlusLambda(500, 1, new DeflatingListener(tempDir, "%d-%d.gz", 500))
+    val tempFile = Files.createTempFile("opl-temp", ".gz")
+    new OnePlusLambda(500, 1, new DeflatingListener(tempFile))
     val listener = new SummaryOnlyListener
     Inflater.apply(500, 1, tempFile, listener)
     listener.expectedOptimalTime should be (2974.0 +- 0.05)
     listener.expectedDriftOptimalTime should be (2974.3 +- 0.05)
     Files.delete(tempFile)
-    Files.delete(tempDir)
   }
 }
