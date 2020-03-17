@@ -54,12 +54,18 @@ object Main {
   def buildReport(cacheDirectoryName: String, resultDirectoryName: String): Unit = {
     val cache = Paths.get(cacheDirectoryName)
     val results = Paths.get(resultDirectoryName)
+    val tikzProbabilities = (-25 to 25).map(i => math.pow(2, i / 5.0))
     for (n <- Seq(1000, 2000, 10000)) {
       for (lLog <- 0 to 15; l = 1 << lLog) {
         val archive = cache.resolve(s"$n-$l.gz")
         if (Files.exists(archive)) {
           val pictureListener = new EllPictureBuildingListener(results.resolve(s"ell-$n-$l.png"))
-          Inflater.apply(n, l, archive, pictureListener)
+          val tikz3DListener = new RelativeOptimalityTikZPictureBuilder(
+            probabilities = tikzProbabilities,
+            standardPath = results.resolve(s"std-$n-$l.tex3d"),
+            shiftPath = results.resolve(s"shf-$n-$l.tex3d")
+          )
+          Inflater(n, l, archive, pictureListener ++ tikz3DListener)
           println(s"$archive processed")
         } else {
           println(s"Warning: could not find $archive")
