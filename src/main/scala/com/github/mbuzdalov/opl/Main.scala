@@ -5,6 +5,8 @@ import java.nio.file.{Files, Paths}
 import java.util.concurrent.{Callable, Executors}
 import java.util.{ArrayList => JArrayList}
 
+import scala.util.Using
+
 object Main {
   def driftNonOptimal(outputFileName: String): Unit = {
     val tasks = new JArrayList[Callable[Unit]]()
@@ -56,19 +58,25 @@ object Main {
     val results = Paths.get(resultDirectoryName)
     val tikzProbabilities = (-25 to 25).map(i => math.pow(2, i / 5.0))
     for (n <- Seq(1000, 2000, 10000)) {
-      for (lLog <- 0 to 15; l = 1 << lLog) {
-        val archive = cache.resolve(s"$n-$l.gz")
-        if (Files.exists(archive)) {
-          val pictureListener = new EllPictureBuildingListener(results.resolve(s"ell-$n-$l.png"))
-          val tikz3DListener = new RelativeOptimalityTikZPictureBuilder(
-            probabilities = tikzProbabilities,
-            standardPath = results.resolve(s"std-$n-$l.tex3d"),
-            shiftPath = results.resolve(s"shf-$n-$l.tex3d")
-          )
-          Inflater(n, l, archive, pictureListener ++ tikz3DListener)
-          println(s"$archive processed")
-        } else {
-          println(s"Warning: could not find $archive")
+      Using.resource(Files.newBufferedWriter(results.resolve(s"ell-best-$n.csv"))) { res =>
+        res.write("lambda,expectation")
+        res.newLine()
+        for (lLog <- 0 to 15; l = 1 << lLog) {
+          val archive = cache.resolve(s"$n-$l.gz")
+          if (Files.exists(archive)) {
+            val pictureListener = new EllPictureBuildingListener(results.resolve(s"ell-$n-$l.png"))
+            val tikz3DListener = new RelativeOptimalityTikZPictureBuilder(
+              probabilities = tikzProbabilities,
+              standardPath = results.resolve(s"std-$n-$l.tex3d"),
+              shiftPath = results.resolve(s"shf-$n-$l.tex3d"))
+            val summaryListener = new SummaryOnlyListener
+            Inflater(n, l, archive, pictureListener ++ tikz3DListener ++ summaryListener)
+            res.write(s"$l,${summaryListener.expectedOptimalTime}")
+            res.newLine()
+            println(s"$archive processed")
+          } else {
+            println(s"Warning: could not find $archive")
+          }
         }
       }
     }
