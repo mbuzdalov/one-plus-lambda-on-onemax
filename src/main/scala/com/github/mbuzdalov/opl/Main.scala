@@ -82,11 +82,40 @@ object Main {
     }
   }
 
+  def buildLargeCSV(cacheDirectoryName: String, csvFileName: String): Unit = {
+    val cache = Paths.get(cacheDirectoryName)
+    Using.resource(Files.newBufferedWriter(Paths.get(csvFileName))) { out =>
+      out.write("n,lambda,d,Bits to flip optimally,Expected running time when acting optimally,Bits to flip to maximize drift,Expected running time when maximizing drift")
+      out.newLine()
+      for (n <- Seq(1000, 2000, 10000)) {
+        for (lLog <- 0 to 15; l = 1 << lLog) {
+          val archive = cache.resolve(s"$n-$l.gz")
+          if (Files.exists(archive)) {
+            val logger = new OnePlusLambdaListener.Adapter {
+              override def finishComputingDistance(d: Int,
+                                                   optimalValue: Double, optimalEll: Int,
+                                                   driftOptimalValue: Double, driftOptimalEll: Int,
+                                                   maximalDrift: Double): Unit = {
+                out.write(s"$n,$l,$d,$optimalEll,$optimalValue,$driftOptimalEll,$driftOptimalValue")
+                out.newLine()
+              }
+            }
+            Inflater(n, l, archive, logger)
+            println(s"$archive processed")
+          } else {
+            println(s"Warning: could not find $archive")
+          }
+        }
+      }
+    }
+  }
+
   def main(args: Array[String]): Unit = {
     args(0) match {
       case "drift-non-optimal" => driftNonOptimal(args(1))
       case "powers-of-two-populate" => populatePowersOfTwo(args(1), args(2).toInt)
       case "build-report" => buildReport(args(1), args(2))
+      case "build-csv" => buildLargeCSV(args(1), args(2))
       case other => println(s"Command '$other' not recognized'")
     }
   }
