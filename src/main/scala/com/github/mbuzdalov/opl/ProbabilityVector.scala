@@ -26,21 +26,25 @@ class ProbabilityVector(val size: Int) {
     val b = that.getData
     var aa = preDataProbability
     var bb = that.getPreData
-    var sum = 0.0
     var i = 0
     while (i < a.length) {
       aa += a(i)
       bb += b(i)
       a(i) = aa * b(i) + bb * a(i) - a(i) * b(i)
-      sum += a(i)
-      i += 1
-    }
-    sum /= 1 - preDataProbability * that.getPreData
-    i = 0
-    while (i < a.length) {
-      a(i) /= sum
       i += 1
     }
     preDataProbability *= that.getPreData
+  }
+}
+
+object ProbabilityVector {
+  def multiplyByPower(power: Int, unit: ProbabilityVector, result: ProbabilityVector): Unit = {
+    var p = power
+    while (p > 1) {
+      if ((p & 1) == 1) result *= unit
+      unit *= unit
+      p >>>= 1
+    }
+    if (p == 1) result *= unit
   }
 }

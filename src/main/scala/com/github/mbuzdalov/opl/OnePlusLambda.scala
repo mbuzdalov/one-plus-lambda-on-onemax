@@ -1,21 +1,15 @@
 package com.github.mbuzdalov.opl
 
+import com.github.mbuzdalov.opl.transition.{BoundedProbabilityFinder, TransitionProbabilityFinder}
+import com.github.mbuzdalov.opl.MathEx.logChoose
+
 class OnePlusLambda(n: Int, lambda: Int, listener: OnePlusLambdaListener) {
-  private[this] val logChoose = new MathEx.LogChoose(n)
   private[this] val optimalTimeCache, driftMaximizingCache = Array.fill(n)(Double.NaN)
   private[this] val driftMaximizingByStrength = Array.fill(n)(Double.NaN)
+  private[this] val probabilityTarget = Array.fill(n + 1)(Double.NaN)
+  private[this] val pv: TransitionProbabilityFinder = BoundedProbabilityFinder
 
   computeEverything()
-
-  private def multiplyByPower(power: Int, unit: ProbabilityVector, result: ProbabilityVector): Unit = {
-    var p = power
-    while (p > 1) {
-      if ((p & 1) == 1) result *= unit
-      unit *= unit
-      p >>>= 1
-    }
-    if (p == 1) result *= unit
-  }
 
   private def computeEverything(): Unit = {
     listener.startComputing(n, lambda)
@@ -57,24 +51,12 @@ class OnePlusLambda(n: Int, lambda: Int, listener: OnePlusLambdaListener) {
     var updateSumOptimal, updateSumDriftOptimal, drift = 0.0
     var updateProb = 0.0
 
-    if (upper >= lower) {
-      val cnc = logChoose(n, change)
-      val unit, prob = new ProbabilityVector(upper - lower + 1)
-      var okay = 0
-      while (okay <= upper - lower) {
-        unit.set(okay, math.exp(logChoose(d, okay + lower) + logChoose(n - d, change - okay - lower) - cnc))
-        okay += 1
-      }
-
-      unit.setPreDataByArray()
-      if (unit.getPreData < 1)
-        multiplyByPower(lambda, unit, prob)
-
-      var i = 0
-      while (i < prob.size) {
-        val okay = lower + i
+    if (lower <= upper) {
+      pv.find(n, lambda, d, change, probabilityTarget)
+      var okay = lower
+      while (okay <= upper) {
         val newD = d - 2 * okay + change
-        val pi = prob.get(i)
+        val pi = probabilityTarget(okay - lower)
         if (newD < d) {
           updateProb += pi
           if (newD > 0) {
@@ -83,7 +65,7 @@ class OnePlusLambda(n: Int, lambda: Int, listener: OnePlusLambdaListener) {
           }
           drift += (d - newD) * pi
         }
-        i += 1
+        okay += 1
       }
     }
 

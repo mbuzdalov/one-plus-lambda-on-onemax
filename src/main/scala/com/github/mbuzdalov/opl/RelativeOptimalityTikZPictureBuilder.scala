@@ -5,17 +5,15 @@ import java.nio.file.{Files, Path}
 
 import scala.util.Using
 
-import com.github.mbuzdalov.opl.MathEx.LogChoose
+import com.github.mbuzdalov.opl.MathEx.logChoose
 
 class RelativeOptimalityTikZPictureBuilder(probabilities: Seq[Double], standardPath: Path, shiftPath: Path) extends OnePlusLambdaListener {
   private[this] var currentNumerators, currentDenominators: Array[Double] = _
   private[this] var currentN: Int = _
   private[this] var probabilityResultsStandard, probabilityResultsShift: Array[Array[Double]] = _
-  private[this] var logChoose: LogChoose = _
 
   override def startComputing(n: Int, lambda: Int): Unit = {
     currentN = n
-    logChoose = new LogChoose(n)
     currentNumerators = new Array[Double](n)
     currentDenominators = new Array[Double](n)
     probabilityResultsStandard = Array.fill(n / 2, probabilities.size)(0.0)
@@ -70,7 +68,6 @@ class RelativeOptimalityTikZPictureBuilder(probabilities: Seq[Double], standardP
 
     currentNumerators = null
     currentDenominators = null
-    logChoose = null
     for (i <- probabilities.indices) {
       probabilityResultsStandard(i) = null
       probabilityResultsShift(i) = null
