@@ -1,31 +1,33 @@
 package com.github.mbuzdalov.opl
 
 class ProbabilityVector(val size: Int) {
-  private[this] val data = new Array[Double](size)
-  private[this] var preDataProbability = 1.0
+  private[this] val data = new Array[Double](size + 1)
+  data(0) = 1.0
 
   private def getData: Array[Double] = data
 
-  def get(index: Int): Double = data(index)
-  def set(index: Int, value: Double): Unit = data(index) = value
+  def get(index: Int): Double = data(index + 1)
+  def set(index: Int, value: Double): Unit = data(index + 1) = value
 
   def setPreDataByArray(): Unit = {
-    preDataProbability = 1.0
+    var preDataProbability = 1.0
     var i = data.length
-    while (i > 0) {
+    while (i > 1) {
       i -= 1
       preDataProbability -= data(i)
     }
+    data(0) = preDataProbability
   }
 
-  def getPreData: Double = preDataProbability
-  def setPreData(value: Double): Unit = preDataProbability = value
+  def getPreData: Double = data(0)
+  def setPreData(value: Double): Unit = data(0) = value
 
-  def *= (that: ProbabilityVector): Unit = {
-    val a = data
-    val b = that.getData
-    var aa = preDataProbability
-    var bb = that.getPreData
+  def *= (that: ProbabilityVector): Unit = ProbabilityVector.multiplyInPlace(data, that.getData)
+}
+
+object ProbabilityVector {
+  def multiplyInPlace(a: Array[Double], b: Array[Double]): Unit = {
+    var aa, bb = 0.0
     var i = 0
     while (i < a.length) {
       aa += a(i)
@@ -33,11 +35,8 @@ class ProbabilityVector(val size: Int) {
       a(i) = aa * b(i) + bb * a(i) - a(i) * b(i)
       i += 1
     }
-    preDataProbability *= that.getPreData
   }
-}
 
-object ProbabilityVector {
   def multiplyByPower(power: Int, unit: ProbabilityVector, result: ProbabilityVector): Unit = {
     var p = power
     while (p > 1) {
