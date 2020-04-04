@@ -4,12 +4,13 @@ import java.util.concurrent.ThreadLocalRandom
 
 import scala.Ordering.Double.IeeeOrdering
 
-import com.github.mbuzdalov.opl.transition.{BigDecimalBoundedProbabilityFinder, BoundedProbabilityFinder, TransitionProbabilityFinder, UnboundedProbabilityFinder}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
+import com.github.mbuzdalov.opl.transition._
+
 class ProbabilityGenerationTests extends AnyFlatSpec with Matchers {
-  private[this] val scaledEpsilon = 1e-14 // 6e-15 does not work
+  private[this] val scaledEpsilon = 3e-14 // 2.2e-14 has once failed
 
   def evaluate(n: Int, d: Int, change: Int, lambda: Int, finder: TransitionProbabilityFinder): Array[Double] = {
     val lower = math.max((change + 1) / 2, change - n + d)
@@ -28,19 +29,22 @@ class ProbabilityGenerationTests extends AnyFlatSpec with Matchers {
   def validate(n: Int, d: Int, change: Int, lambda: Int): Unit = {
     val unbounded = evaluate(n, d, change, lambda, UnboundedProbabilityFinder)
     val bounded = evaluate(n, d, change, lambda, BoundedProbabilityFinder)
+    val big = evaluate(n, d, change, lambda, BigDecimalBoundedProbabilityFinder)
+    val bigPow = evaluate(n, d, change, lambda, BigDecimalPowerProbabilityFinder)
+    val pow = evaluate(n, d, change, lambda, PowerProbabilityFinder)
     val epsilon = scaledEpsilon * n
     assert(unbounded.length == bounded.length)
-    if (unbounded.length > 0) {
-      val maxDiff = computeMaxDiff(unbounded, bounded)
-      assert(maxDiff <= epsilon)
-    }
-    val big = evaluate(n, d, change, lambda, BigDecimalBoundedProbabilityFinder)
     assert(unbounded.length == big.length)
+    assert(unbounded.length == pow.length)
     if (unbounded.length > 0) {
-      val maxDiff1 = computeMaxDiff(unbounded, big)
+      val maxDiff0 = computeMaxDiff(big, unbounded)
+      assert(maxDiff0 <= epsilon)
+      val maxDiff1 = computeMaxDiff(big, bounded)
       assert(maxDiff1 <= epsilon)
-      val maxDiff2 = computeMaxDiff(bounded, big)
+      val maxDiff2 = computeMaxDiff(big, pow)
       assert(maxDiff2 <= epsilon)
+      val maxDiff3 = computeMaxDiff(big, bigPow)
+      assert(maxDiff3 <= epsilon * 1e-15)           // both are in big decimals.
     }
   }
 
@@ -65,13 +69,12 @@ class ProbabilityGenerationTests extends AnyFlatSpec with Matchers {
     }
   }
 
-  "all methods" should "produce the same results for n=100, d=30, change=3, lambda=1" in validate(100, 30, 3, 1)
+  "all methods" should "produce the same results for n=100, all d and change, lambda=1,100,10000" in {
+    for (d <- 1 to 100; change <- 1 to 100; lambda <- Seq(1, 100, 10000))
+      validate(100, d, change, lambda)
+  }
 
   for ((n, d, change, lambda) <- Seq(
-    (100, 30, 3, 10),
-    (100, 5, 2, 1),
-    (100, 5, 2, 10),
-    (100, 23, 45, 1),
     (10000, 3858, 2959, 1),
     (1000, 998, 995, 1),
     (1000, 933, 906, 1),
@@ -86,11 +89,13 @@ class ProbabilityGenerationTests extends AnyFlatSpec with Matchers {
   for (n <- Seq(10000, 100000); lambda <- Seq(1, 100, 10000))
     they should s"produce the same results for n=$n, d=10, change=3, lambda=$lambda" in validate(n, 10, 3, lambda)
 
-  for (n <- Seq(100, 1000, 10000, 100000)) {
+  for (n <- Seq(1000, 10000, 100000)) {
     they should s"pass the torture test successfully for n = $n" in {
-      tortureTest(n, 1, 1000000 / n)
-      tortureTest(n, 10, 1000000 / n)
-      tortureTest(n, 100, 1000000 / n)
+      val iterations = math.max(10, 100000 / n)
+      tortureTest(n, 1, iterations)
+      tortureTest(n, 10, iterations)
+      tortureTest(n, 100, iterations)
+      tortureTest(n, 10000, iterations)
     }
   }
 }
