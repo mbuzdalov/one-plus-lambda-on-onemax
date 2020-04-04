@@ -1,6 +1,6 @@
-package com.github.mbuzdalov.opl
+package com.github.mbuzdalov.opl.transition
 
-object ProbabilityVector {
+object ProbabilityVectorUtils {
   def multiplyInPlace(a: Array[Double], b: Array[Double]): Unit = {
     var aa, bb = 0.0
     var i = 0

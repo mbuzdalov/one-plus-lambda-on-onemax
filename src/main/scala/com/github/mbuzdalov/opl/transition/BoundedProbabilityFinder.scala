@@ -1,7 +1,6 @@
 package com.github.mbuzdalov.opl.transition
 
 import com.github.mbuzdalov.opl.MathEx.{logFactorial => lF}
-import com.github.mbuzdalov.opl.ProbabilityVector
 
 object BoundedProbabilityFinder extends TransitionProbabilityFinder {
   override def find(n: Int, lambda: Int, d: Int, change: Int, target: Array[Double]): Unit = {
@@ -22,7 +21,7 @@ object BoundedProbabilityFinder extends TransitionProbabilityFinder {
     unit(0) = 1 - sum
     prob(0) = 1
     if (unit(0) < 1)
-      ProbabilityVector.multiplyByPower(lambda, unit, prob)
+      ProbabilityVectorUtils.multiplyByPower(lambda, unit, prob)
 
     var i = u - l
     while (i >= 0) {
