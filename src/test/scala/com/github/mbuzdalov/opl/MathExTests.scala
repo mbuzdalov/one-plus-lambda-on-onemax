@@ -14,7 +14,9 @@ class MathExTests extends AnyFlatSpec with Matchers {
     }
   }
 
-  "LogChoose" should "compute choose(0,0) correctly" in {MathEx.logChoose(0, 0) shouldBe 0.0}
+  "MathEx.logChoose" should "compute choose(0,0) correctly" in {MathEx.logChoose(0, 0) shouldBe 0.0}
   it should "compute choose(1,1) correctly" in {MathEx.logChoose(1, 1) shouldBe 0.0}
   it should "compute choose(4,2) correctly" in {MathEx.logChoose(4, 2) should be (math.log(6) +- 1e-12)}
+
+  "MathEx.logFactorialBig" should "compute 5! correctly" in {MathEx.logFactorialBig(5).toDouble should be (math.log(120) +- 1e-12)}
 }

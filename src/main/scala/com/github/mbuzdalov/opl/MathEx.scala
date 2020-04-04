@@ -1,5 +1,10 @@
 package com.github.mbuzdalov.opl
 
+import java.math.{MathContext, RoundingMode}
+import java.{util => ju}
+
+import spire.implicits._
+
 object MathEx {
   private[this] var logFactorialCache: Array[Double] = new Array(2)
   private[this] def ensureFactorialExists(n: Int): Unit = {
@@ -19,6 +24,30 @@ object MathEx {
         }
       }
     }
+  }
+
+  final val bigLogFactorialContext = new MathContext(40, RoundingMode.HALF_EVEN)
+  private[this] val bdLogFactorialCache = new ju.ArrayList[BigDecimal](2)
+  bdLogFactorialCache.add(BigDecimal.decimal(0, bigLogFactorialContext))
+  bdLogFactorialCache.add(bdLogFactorialCache.get(0))
+
+  private[this] def ensureBDFactorialExists(n: Int): Unit = {
+    if (bdLogFactorialCache.size() <= n) {
+      synchronized {
+        var sz = bdLogFactorialCache.size()
+        var last = bdLogFactorialCache.get(sz - 1)
+        while (sz <= n) {
+          last += BigDecimal.decimal(sz, bigLogFactorialContext).log()
+          bdLogFactorialCache.add(last)
+          sz += 1
+        }
+      }
+    }
+  }
+
+  def logFactorialBig(n: Int): BigDecimal = {
+    ensureBDFactorialExists(n)
+    bdLogFactorialCache.get(n)
   }
 
   def logFactorial(n: Int): Double = {
