@@ -9,21 +9,24 @@ object BoundedProbabilityFinder extends TransitionProbabilityFinder {
     val u = math.min(change, d)
 
     val common = lF(d) + lF(n - d) - lF(n) + lF(change) + lF(n - change)
-    val unit, prob = new ProbabilityVector(u - l + 1)
+    val unit, prob = new Array[Double](u - l + 2)
     var k = 0
+    var sum = 0.0
     while (k <= u - l) {
-      val dv = math.exp(common - lF(k + l) - lF(d - k - l) - lF(change - k - l) - lF(n - d - change + k + l))
-      unit.set(k, dv)
+      val curr = math.exp(common - lF(k + l) - lF(d - k - l) - lF(change - k - l) - lF(n - d - change + k + l))
       k += 1
+      unit(k) = curr
+      sum += curr
     }
 
-    unit.setPreDataByArray()
-    if (unit.getPreData < 1)
+    unit(0) = 1 - sum
+    prob(0) = 1
+    if (unit(0) < 1)
       ProbabilityVector.multiplyByPower(lambda, unit, prob)
 
     var i = u - l
     while (i >= 0) {
-      target(i) = prob.get(i)
+      target(i) = prob(i + 1)
       i -= 1
     }
   }
