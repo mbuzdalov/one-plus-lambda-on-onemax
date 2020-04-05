@@ -4,12 +4,12 @@ import com.github.mbuzdalov.opl.MathEx.{logFactorialBig => lF}
 import spire.implicits._
 
 object BigDecimalPowerProbabilityFinder extends TransitionProbabilityFinder {
-  override def find(n: Int, lambda: Int, d: Int, change: Int, target: Array[Double]): Unit = {
+  override def find(n: Int, lambda: Int, d: Int, change: Int, target: Array[Double], aux: Aux): Unit = {
     val l = math.max((change + 1) / 2, change - n + d)
     val u = math.min(change, d)
 
     val common = lF(d) + lF(n - d) - lF(n) + lF(change) + lF(n - change)
-    val tmp = new Array[BigDecimal](u - l + 1)
+    val tmp = aux
     var k = 0
     var sum = lF(0)
     while (k <= u - l) {
@@ -31,4 +31,7 @@ object BigDecimalPowerProbabilityFinder extends TransitionProbabilityFinder {
       k += 1
     }
   }
+
+  override type Aux = Array[BigDecimal]
+  override def newAuxiliaryData(n: Int): Aux = new Array(n + 1)
 }

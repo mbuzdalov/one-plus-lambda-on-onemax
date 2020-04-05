@@ -17,7 +17,8 @@ class ProbabilityGenerationTests extends AnyFlatSpec with Matchers {
     val upper = math.min(change, d)
     if (lower <= upper) {
       val target = new Array[Double](upper - lower + 1)
-      finder.find(n, lambda, d, change, target)
+      val aux = finder.newAuxiliaryData(n)
+      finder.find(n, lambda, d, change, target, aux)
       target
     } else {
       new Array(0)

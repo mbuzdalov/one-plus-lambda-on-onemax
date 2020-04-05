@@ -3,7 +3,7 @@ package com.github.mbuzdalov.opl.transition
 import com.github.mbuzdalov.opl.MathEx.{logFactorial => lF}
 
 object PowerProbabilityFinder extends TransitionProbabilityFinder {
-  override def find(n: Int, lambda: Int, d: Int, change: Int, target: Array[Double]): Unit = {
+  override def find(n: Int, lambda: Int, d: Int, change: Int, target: Array[Double], aux: Aux): Unit = {
     val l = math.max((change + 1) / 2, change - n + d)
     val u = math.min(change, d)
 
@@ -29,4 +29,7 @@ object PowerProbabilityFinder extends TransitionProbabilityFinder {
       k += 1
     }
   }
+
+  override type Aux = Unit
+  override def newAuxiliaryData(n: Int): Aux = ()
 }

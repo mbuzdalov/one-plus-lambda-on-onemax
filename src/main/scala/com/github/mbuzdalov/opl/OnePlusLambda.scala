@@ -8,6 +8,7 @@ class OnePlusLambda(n: Int, lambda: Int, listener: OnePlusLambdaListener) {
   private[this] val driftMaximizingByStrength = Array.fill(n)(Double.NaN)
   private[this] val probabilityTarget = Array.fill(n + 1)(Double.NaN)
   private[this] val pv: TransitionProbabilityFinder = BoundedProbabilityFinder
+  private[this] val finderAux = pv.newAuxiliaryData(n)
 
   computeEverything()
 
@@ -52,7 +53,7 @@ class OnePlusLambda(n: Int, lambda: Int, listener: OnePlusLambdaListener) {
     var updateProb = 0.0
 
     if (lower <= upper) {
-      pv.find(n, lambda, d, change, probabilityTarget)
+      pv.find(n, lambda, d, change, probabilityTarget, finderAux)
       var okay = lower
       while (okay <= upper) {
         val newD = d - 2 * okay + change
