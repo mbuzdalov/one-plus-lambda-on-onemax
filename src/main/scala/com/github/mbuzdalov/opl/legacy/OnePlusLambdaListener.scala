@@ -1,4 +1,4 @@
-package com.github.mbuzdalov.opl
+package com.github.mbuzdalov.opl.legacy
 
 trait OnePlusLambdaListener {
   def startComputing(n: Int, lambda: Int): Unit

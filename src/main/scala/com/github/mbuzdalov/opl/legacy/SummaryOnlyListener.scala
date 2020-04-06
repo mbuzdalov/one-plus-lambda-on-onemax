@@ -1,4 +1,4 @@
-package com.github.mbuzdalov.opl
+package com.github.mbuzdalov.opl.legacy
 
 class SummaryOnlyListener extends OnePlusLambdaListener.Adapter {
   private[this] var optimalTime, driftOptimalTime = -1.0

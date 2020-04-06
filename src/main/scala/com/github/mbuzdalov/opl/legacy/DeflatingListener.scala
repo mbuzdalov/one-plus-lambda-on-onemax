@@ -1,4 +1,4 @@
-package com.github.mbuzdalov.opl
+package com.github.mbuzdalov.opl.legacy
 
 import java.io.DataOutputStream
 import java.nio.file.{Files, Path}

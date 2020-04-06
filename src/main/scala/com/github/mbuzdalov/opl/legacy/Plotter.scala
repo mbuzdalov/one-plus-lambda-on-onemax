@@ -1,8 +1,9 @@
-package com.github.mbuzdalov.opl
+package com.github.mbuzdalov.opl.legacy
 
 import java.awt.image._
 import java.io._
 import java.util._
+
 import javax.imageio._
 
 import scala.Ordering.Double.IeeeOrdering

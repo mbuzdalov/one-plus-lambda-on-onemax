@@ -1,7 +1,7 @@
-package com.github.mbuzdalov.opl
+package com.github.mbuzdalov.opl.legacy
 
-import com.github.mbuzdalov.opl.transition.{BoundedProbabilityFinder, TransitionProbabilityFinder}
 import com.github.mbuzdalov.opl.MathEx.logChoose
+import com.github.mbuzdalov.opl.transition.{BoundedProbabilityFinder, TransitionProbabilityFinder}
 
 class OnePlusLambda(n: Int, lambda: Int, listener: OnePlusLambdaListener) {
   private[this] val optimalTimeCache, driftMaximizingCache = Array.fill(n)(Double.NaN)
