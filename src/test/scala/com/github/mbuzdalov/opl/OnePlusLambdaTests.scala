@@ -5,11 +5,11 @@ import org.scalatest.matchers.should.Matchers
 
 import com.github.mbuzdalov.opl.computation.{DriftOptimalRunningTime, OptimalRunningTime}
 
-class NewOnePlusLambdaTests extends AnyFlatSpec with Matchers {
+class OnePlusLambdaTests extends AnyFlatSpec with Matchers {
   private def optimalTimes(n: Int, lambda: Int): (Double, Double) = {
     val optimalListener = OptimalRunningTime.newListener
     val driftOptimalListener = DriftOptimalRunningTime.newListener
-    NewOnePlusLambda(n, lambda, Seq(optimalListener, driftOptimalListener))
+    OnePlusLambda(n, lambda, Seq(optimalListener, driftOptimalListener))
     (optimalListener.toResult.expectedRunningTime, driftOptimalListener.toResult.expectedRunningTime)
   }
 

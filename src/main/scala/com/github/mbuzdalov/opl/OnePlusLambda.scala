@@ -3,7 +3,7 @@ package com.github.mbuzdalov.opl
 import com.github.mbuzdalov.opl.computation.BareComputationListener
 import com.github.mbuzdalov.opl.transition.BoundedProbabilityFinder
 
-object NewOnePlusLambda {
+object OnePlusLambda {
   private val myFinder = BoundedProbabilityFinder
 
   def apply(n: Int, lambda: Int, listeners: Seq[BareComputationListener]): Unit = {
