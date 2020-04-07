@@ -10,14 +10,14 @@ class SizedDelegatingListener[P](constructor: (Int, Int) => ComputationListener[
     delegate = constructor(problemSize, populationSize)
   override def startDistance(distance: Int): Unit =
     delegate.startDistance(distance)
-  override def startTransitionProbabilityGroup(change: Int): Unit =
-    delegate.startTransitionProbabilityGroup(change)
-  override def receiveTransitionProbability(newDistance: Int, probability: Double): Unit =
-    delegate.receiveTransitionProbability(newDistance, probability)
-  override def finishTransitionProbabilityGroup(): Unit =
-    delegate.finishTransitionProbabilityGroup()
-  override def finishDistance(): Unit =
-    delegate.finishDistance()
+  override def startTransitionProbabilityGroup(distance: Int, change: Int): Unit =
+    delegate.startTransitionProbabilityGroup(distance, change)
+  override def receiveTransitionProbability(change: Int, currDistance: Int, newDistance: Int, probability: Double): Unit =
+    delegate.receiveTransitionProbability(change, currDistance, newDistance, probability)
+  override def finishTransitionProbabilityGroup(distance: Int, change: Int): Unit =
+    delegate.finishTransitionProbabilityGroup(distance, change)
+  override def finishDistance(distance: Int): Unit =
+    delegate.finishDistance(distance)
   override def toResult: ComputationResult[P] =
     delegate.toResult
 }

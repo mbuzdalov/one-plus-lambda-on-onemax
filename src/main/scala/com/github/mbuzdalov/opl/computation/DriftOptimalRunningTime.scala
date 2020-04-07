@@ -21,41 +21,32 @@ object DriftOptimalRunningTime {
     private[this] val expectations, drifts, currDrifts = new Array[Double](problemSize)
     private[this] val bestBitFlip = new Array[Int](problemSize)
     private[this] val bitFlipMatrix = Array.fill(problemSize, problemSize)(0.0)
-
-    private[this] var currDistance, currChange: Int = _
-    private[this] var currDrift: Double = _
-    private[this] val filler = new BitFlipMatrixFiller(expectations, bitFlipMatrix)
+    private[this] val tracker = new ConditionalExpectationTracker(expectations)
 
     override def startComputing(problemSize: Int, populationSize: Int): Unit =
       throw new IllegalStateException("Sizes are already set")
 
-    override def startDistance(distance: Int): Unit = {
-      currDistance = distance
-      filler.startDistance(distance)
+    override def startDistance(distance: Int): Unit = {}
+
+    override def startTransitionProbabilityGroup(distance: Int, change: Int): Unit = {
+      tracker.reset()
+      currDrifts(change - 1) = 0
     }
 
-    override def startTransitionProbabilityGroup(change: Int): Unit = {
-      filler.startGroup(change)
-      currChange = change
-      currDrift = 0
+    override def receiveTransitionProbability(change: Int, currDistance: Int, newDistance: Int, probability: Double): Unit = {
+      tracker.receiveProbability(newDistance, probability)
+      currDrifts(change - 1) += probability * (currDistance - newDistance)
     }
 
-    override def receiveTransitionProbability(newDistance: Int, probability: Double): Unit = {
-      filler.receiveProbability(newDistance, probability)
-      currDrift += probability * (currDistance - newDistance)
-    }
+    override def finishTransitionProbabilityGroup(distance: Int, change: Int): Unit =
+      bitFlipMatrix(distance - 1)(change - 1) = (1 + tracker.getConditionalExpectation) / tracker.getUpdateProbability
 
-    override def finishTransitionProbabilityGroup(): Unit = {
-      filler.finishGroup()
-      currDrifts(currChange - 1) = currDrift
-    }
-
-    override def finishDistance(): Unit = {
+    override def finishDistance(distance: Int): Unit = {
       var bestFlip = 0
       var bestDrift = 0.0
       var bestValue = Double.PositiveInfinity
       var flip = 0
-      val bitFlipSlice = bitFlipMatrix(currDistance - 1)
+      val bitFlipSlice = bitFlipMatrix(distance - 1)
       while (flip < problemSize) {
         val currD = currDrifts(flip)
         val currV = bitFlipSlice(flip) // both intentionally before increment
@@ -66,9 +57,9 @@ object DriftOptimalRunningTime {
           bestFlip = flip
         }
       }
-      expectations(currDistance - 1) = bestValue
-      drifts(currDistance - 1) = bestDrift
-      bestBitFlip(currDistance - 1) = bestFlip
+      expectations(distance - 1) = bestValue
+      bestBitFlip(distance - 1) = bestFlip
+      drifts(distance - 1) = bestDrift
     }
 
     override def toResult: ComputationResult[Int] =
