@@ -24,10 +24,9 @@ object RelativeOptimalityPictureBuilder {
       while (yIndex < ordinateValues.length) {
         val currValue = source.optimalExpectationForParameter(xIndex + xMin, ordinateValues(yIndex))
         val value01 = math.exp(bestValue - currValue)
-        if (value01 > 1) {
-          throw new AssertionError(s"bestValue = $bestValue, currValue = $currValue")
-        }
-        image.setRGB(xIndex, ordinateValues.length - yIndex - 1, Viridis(value01))
+        if (value01.isNaN) throw new IllegalArgumentException(s"best value = $bestValue, curr value = $currValue")
+        val rgb = if (value01 > 1) 0xff0000 else Viridis(value01)
+        image.setRGB(xIndex, ordinateValues.length - yIndex - 1, rgb)
         yIndex += 1
       }
       xIndex += 1
