@@ -1,5 +1,6 @@
 package com.github.mbuzdalov.opl.computation
 
+import scala.Ordering.Double.IeeeOrdering
 import scala.annotation.tailrec
 
 object OptimalMutationRunningTime {
@@ -60,36 +61,51 @@ object OptimalMutationRunningTime {
 
   private def computeExpectedRunningTime(conditionalExpectations: Array[Double], updateProbabilities: Array[Double],
                                          probability: Double, useShift: Boolean): Double = {
-    // P[t bits flipped] = p^t * (1-p)^(n-t) * choose(n, t)
-    import com.github.mbuzdalov.opl.MathEx.{logFactorial => lF}
-    val logP = math.log(probability)
-    val log1P = math.log1p(-probability)
+    if (probability == 0) {
+      // Flip nothing. This depends on useShift
+      if (useShift)
+        (1 + conditionalExpectations(0)) / updateProbabilities(0)
+      else
+        Double.PositiveInfinity
+    } else if (probability == 1) {
+      // A complete inversion. useShift does not matter
+      (1 + conditionalExpectations.last) / updateProbabilities.last
+    } else {
+      // P[t bits flipped] = p^t * (1-p)^(n-t) * choose(n, t)
+      import com.github.mbuzdalov.opl.MathEx.{logFactorial => lF}
+      val logP = math.log(probability) // now those would not be infinities
+      val log1P = math.log1p(-probability)
 
-    var totalConditionalExpectation, totalUpdateProbability = 0.0
-    var nFlipped = 0
-    val n = conditionalExpectations.length
-    val lfn = lF(n)
-    while (nFlipped < n) {
-      val ce = conditionalExpectations(nFlipped)
-      val up = updateProbabilities(nFlipped)
-      nFlipped += 1
-      // ce can be Infinity, as one cannot reach an improvement from that point (e.g. distance=1, bit flips=2)
-      // We shall not count that as an update!
-      // In the case of an FP overflow, this seems to be also safe unless we to numeric search
-      if (!ce.isInfinity) {
-        val prob = math.exp(logP * nFlipped + log1P * (n - nFlipped) + lfn - lF(nFlipped) - lF(n - nFlipped))
-        totalUpdateProbability += up * prob
-        totalConditionalExpectation += ce * prob
+      var totalConditionalExpectation, totalUpdateProbability = 0.0
+      var nFlipped = 0
+      val n = conditionalExpectations.length
+      val lfn = lF(n)
+      while (nFlipped < n) {
+        val ce = conditionalExpectations(nFlipped)
+        val up = updateProbabilities(nFlipped)
+        nFlipped += 1
+        // ce can be Infinity, as one cannot reach an improvement from that point (e.g. distance=1, bit flips=2)
+        // We shall not count that as an update!
+        // In the case of an FP overflow, this seems to be also safe unless we to numeric search
+        if (ce.isFinite) {
+          val prob = math.exp(logP * nFlipped + log1P * (n - nFlipped) + lfn - lF(nFlipped) - lF(n - nFlipped))
+          totalUpdateProbability += up * prob
+          totalConditionalExpectation += ce * prob
+        }
       }
+      if (useShift) {
+        val ce = conditionalExpectations(0)
+        val up = updateProbabilities(0)
+        if (ce.isFinite) {
+          val prob = math.exp(log1P * n)
+          totalUpdateProbability += up * prob
+          totalConditionalExpectation += ce * prob
+        }
+      }
+      val rv = (1 + totalConditionalExpectation) / totalUpdateProbability
+      assert(!rv.isNaN)
+      rv
     }
-    if (useShift) {
-      val prob = math.exp(log1P * n)
-      totalUpdateProbability += updateProbabilities(0) * prob
-      totalConditionalExpectation += conditionalExpectations(0) * prob
-    }
-    val rv = (1 + totalConditionalExpectation) / totalUpdateProbability
-    assert(!rv.isNaN)
-    rv
   }
 
   @tailrec
@@ -115,18 +131,21 @@ object OptimalMutationRunningTime {
                                           useShift: Boolean): Double = {
     if (useShift) {
       val n = conditionalExpectations.length
-      val probLarge = ternarySearch(conditionalExpectations, updateProbabilities, useShift, 1.0 / n, 1.0, 50)
+      val probLarge = ternarySearch(conditionalExpectations, updateProbabilities, useShift, 1.0 / n, 1.0, 75)
       val valueLarge = computeExpectedRunningTime(conditionalExpectations, updateProbabilities, probLarge, useShift)
-      val probSmall = ternarySearch(conditionalExpectations, updateProbabilities, useShift, 0, 1.0 / n, 50)
+      val probSmall = ternarySearch(conditionalExpectations, updateProbabilities, useShift, 0, 1.0 / n, 75)
       val valueSmall = computeExpectedRunningTime(conditionalExpectations, updateProbabilities, probSmall, useShift)
       val value0 = computeExpectedRunningTime(conditionalExpectations, updateProbabilities, 0, useShift)
-      if (valueLarge < valueSmall && valueLarge < value0)
-        probLarge
-      else if (valueSmall < valueLarge && valueSmall < value0)
-        probSmall
+      val value1 = computeExpectedRunningTime(conditionalExpectations, updateProbabilities, 1, useShift)
+      Array((probLarge, valueLarge), (probSmall, valueSmall), (0.0, value0), (1.0, value1)).minBy(_._2)._1
+    } else {
+      val value1 = computeExpectedRunningTime(conditionalExpectations, updateProbabilities, 1, useShift)
+      val ternary = ternarySearch(conditionalExpectations, updateProbabilities, useShift, 0, 1.0, 75)
+      val ternaryV = computeExpectedRunningTime(conditionalExpectations, updateProbabilities, ternary, useShift)
+      if (value1 < ternaryV)
+        1
       else
-        0
-    } else
-      ternarySearch(conditionalExpectations, updateProbabilities, useShift, 0, 1.0, 50)
+        ternary
+    }
   }
 }
