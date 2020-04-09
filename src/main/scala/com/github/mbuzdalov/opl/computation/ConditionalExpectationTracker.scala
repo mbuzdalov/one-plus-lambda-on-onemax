@@ -10,8 +10,11 @@ private class ConditionalExpectationTracker(expectations: Array[Double]) {
 
   def receiveProbability(newDistance: Int, probability: Double): Unit = {
     updateProbability += probability
-    if (newDistance >= 1)
-      conditionalExpectation += probability * expectations(newDistance - 1)
+    if (newDistance >= 1) {
+      val exp = expectations(newDistance - 1)
+      assert(exp.isFinite)
+      conditionalExpectation += probability * exp
+    }
   }
 
   def getConditionalExpectation: Double = conditionalExpectation

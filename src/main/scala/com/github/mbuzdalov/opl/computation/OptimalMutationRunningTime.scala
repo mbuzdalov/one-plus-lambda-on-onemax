@@ -50,6 +50,7 @@ object OptimalMutationRunningTime {
       val bestMutation = findBestMutationProbability(condExp, updProb, useShift)
       bestMutationProbability(distance - 1) = bestMutation
       expectations(distance - 1) = computeExpectedRunningTime(condExp, updProb, bestMutation, useShift)
+      assert(expectations(distance - 1).isFinite)
     }
 
     override def toResult: ComputationResult[Double] =
@@ -72,16 +73,23 @@ object OptimalMutationRunningTime {
       val ce = conditionalExpectations(nFlipped)
       val up = updateProbabilities(nFlipped)
       nFlipped += 1
-      val prob = math.exp(logP * nFlipped + log1P * (n - nFlipped) + lfn - lF(nFlipped) - lF(n - nFlipped))
-      totalUpdateProbability += up * prob
-      totalConditionalExpectation += ce * prob
+      // ce can be Infinity, as one cannot reach an improvement from that point (e.g. distance=1, bit flips=2)
+      // We shall not count that as an update!
+      // In the case of an FP overflow, this seems to be also safe unless we to numeric search
+      if (!ce.isInfinity) {
+        val prob = math.exp(logP * nFlipped + log1P * (n - nFlipped) + lfn - lF(nFlipped) - lF(n - nFlipped))
+        totalUpdateProbability += up * prob
+        totalConditionalExpectation += ce * prob
+      }
     }
     if (useShift) {
       val prob = math.exp(log1P * n)
       totalUpdateProbability += updateProbabilities(0) * prob
       totalConditionalExpectation += conditionalExpectations(0) * prob
     }
-    (1 + totalConditionalExpectation) / totalUpdateProbability
+    val rv = (1 + totalConditionalExpectation) / totalUpdateProbability
+    assert(!rv.isNaN)
+    rv
   }
 
   @tailrec
@@ -95,7 +103,7 @@ object OptimalMutationRunningTime {
       val rr = (left + 2 * right) / 3
       val lv = computeExpectedRunningTime(conditionalExpectations, updateProbabilities, ll, useShift)
       val rv = computeExpectedRunningTime(conditionalExpectations, updateProbabilities, rr, useShift)
-      if (lv < rv)
+      if (lv <= rv || rv.isInfinity) // this would decrease the probability if everything does to infinity
         ternarySearch(conditionalExpectations, updateProbabilities, useShift, left, rr, remainingIterations - 1)
       else
         ternarySearch(conditionalExpectations, updateProbabilities, useShift, ll, right, remainingIterations - 1)
