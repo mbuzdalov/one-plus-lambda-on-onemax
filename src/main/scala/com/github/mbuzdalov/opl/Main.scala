@@ -114,10 +114,12 @@ object Main {
     Files.createDirectories(targetRoot)
     val nValues = args(1).split(',').map(_.toInt)
     val lambdaValues = args(2).split(',').map(_.toInt)
-    for (n <- nValues) {
-      val allBitFlips = Array.tabulate(n)(i => i + 1)
-      val probabilities = Array.tabulate(201)(i => math.pow(2, (i - 100) / 5.0) / n).filter(_ < 1)
-      for (lambda <- lambdaValues) {
+
+    class Task(n: Int, lambda: Int) extends Callable[Unit] {
+      override def call(): Unit = {
+        val allBitFlips = Array.tabulate(n)(i => i + 1)
+        val probabilities = Array.tabulate(201)(i => math.pow(2, (i - 100) / 5.0) / n).filter(_ < 1)
+
         val t0 = timer(s"[n=$n, lambda=$lambda] Creating listeners...")
         val optimalListener = OptimalRunningTime.newListener
         val driftOptimalListener = DriftOptimalRunningTime.newListener
@@ -134,38 +136,54 @@ object Main {
         t1.done()
 
         val t3 = timer(s"[n=$n, lambda=$lambda] Computing and writing optimal picture...")
-        RelativeOptimalityPictureBuilder(source = optimalResult,
-                                         optimalitySource = optimalResult,
-                                         ordinateValues = allBitFlips,
-                                         xMin = 1, xMax = n,
-                                         target = targetRoot.resolve(s"optimal-$n-$lambda.png"))
+        RelativeOptimalityPictureBuilder(
+          source = optimalResult,
+          optimalitySource = optimalResult,
+          ordinateValues = allBitFlips,
+          xMin = 1, xMax = n,
+          target = targetRoot.resolve(s"optimal-$n-$lambda.png")
+        )
         t3.done()
 
         val t4 = timer(s"[n=$n, lambda=$lambda] Computing and writing drift-optimal picture...")
-        RelativeOptimalityPictureBuilder(source = driftOptimalResult,
-                                         optimalitySource = optimalResult,
-                                         ordinateValues = allBitFlips,
-                                         xMin = 1, xMax = n,
-                                         target = targetRoot.resolve(s"drift-optimal-$n-$lambda.png"))
+        RelativeOptimalityPictureBuilder(
+          source = driftOptimalResult,
+          optimalitySource = optimalResult,
+          ordinateValues = allBitFlips,
+          xMin = 1, xMax = n,
+          target = targetRoot.resolve(s"drift-optimal-$n-$lambda.png")
+        )
         t4.done()
 
         val t5 = timer(s"[n=$n, lambda=$lambda] Computing and writing relative optimal standard-bit mutation picture...")
-        RelativeOptimalityPictureBuilder(source = optimalStandardResult,
-                                         optimalitySource = optimalStandardResult,
-                                         ordinateValues = probabilities,
-                                         xMin = 1, xMax = n,
-                                         target = targetRoot.resolve(s"standard-optimal-$n-$lambda.png"))
+        RelativeOptimalityPictureBuilder(
+          source = optimalStandardResult,
+          optimalitySource = optimalStandardResult,
+          ordinateValues = probabilities,
+          xMin = 1, xMax = n,
+          target = targetRoot.resolve(s"standard-optimal-$n-$lambda.png")
+        )
         t5.done()
 
         val t6 = timer(s"[n=$n, lambda=$lambda] Computing and writing relative optimal shift mutation picture...")
-        RelativeOptimalityPictureBuilder(source = optimalShiftResult,
-                                         optimalitySource = optimalShiftResult,
-                                         ordinateValues = probabilities,
-                                         xMin = 1, xMax = n,
-                                         target = targetRoot.resolve(s"shift-optimal-$n-$lambda.png"))
+        RelativeOptimalityPictureBuilder(
+          source = optimalShiftResult,
+          optimalitySource = optimalShiftResult,
+          ordinateValues = probabilities,
+          xMin = 1, xMax = n,
+          target = targetRoot.resolve(s"shift-optimal-$n-$lambda.png")
+        )
         t6.done()
       }
     }
+
+    val tasks = new JArrayList[Task]()
+    for (n <- nValues; lambda <- lambdaValues) tasks.add(new Task(n, lambda))
+    val pool = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors())
+    val futures = pool.invokeAll(tasks)
+    futures.asScala.foreach(_.get())
+    pool.shutdown()
+    pool.awaitTermination(1, TimeUnit.HOURS)
   }
 
   def main(args: Array[String]): Unit = args(0) match {
