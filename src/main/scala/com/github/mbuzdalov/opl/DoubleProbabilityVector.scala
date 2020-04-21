@@ -56,6 +56,16 @@ class DoubleProbabilityVector(n: Int) extends ProbabilityVector {
         sumSuffix = nextSum
         i -= 1
       }
+      compact()
+    }
+  }
+
+  private def compact(): Unit = {
+    while (lower <= upper && probabilities(lower) == 0) {
+      lower += 1
+    }
+    while (lower <= upper && probabilities(upper) == 0) {
+      upper -= 1
     }
   }
 
@@ -66,30 +76,32 @@ class DoubleProbabilityVector(n: Int) extends ProbabilityVector {
     var firstTime = true
     while (firstIndex <= firstUpper) {
       val prob = first.probability(firstIndex)
-      val secondLower = second.minDistance(firstIndex)
-      val secondUpper = second.maxDistance(firstIndex)
-      val secondStep = second.stepDistance(firstIndex)
+      if (prob > 0) {
+        val secondLower = second.minDistance(firstIndex)
+        val secondUpper = second.maxDistance(firstIndex)
+        val secondStep = second.stepDistance(firstIndex)
 
-      if (secondLower <= secondUpper) {
-        if (firstTime) {
-          firstTime = false
-          setBounds(secondLower, secondUpper)
-          JArrays.fill(probabilities, secondLower, secondUpper + 1, 0.0)
-        } else {
-          if (lower > secondLower) {
-            JArrays.fill(probabilities, secondLower, lower, 0.0)
-            lower = secondLower
+        if (secondLower <= secondUpper) {
+          if (firstTime) {
+            firstTime = false
+            setBounds(secondLower, secondUpper)
+            JArrays.fill(probabilities, secondLower, secondUpper + 1, 0.0)
+          } else {
+            if (lower > secondLower) {
+              JArrays.fill(probabilities, secondLower, lower, 0.0)
+              lower = secondLower
+            }
+            if (upper < secondUpper) {
+              JArrays.fill(probabilities, upper + 1, secondUpper + 1, 0.0)
+              upper = secondUpper
+            }
           }
-          if (upper < secondUpper) {
-            JArrays.fill(probabilities, upper + 1, secondUpper + 1, 0.0)
-            upper = secondUpper
-          }
-        }
 
-        var secondIndex = secondLower
-        while (secondIndex <= secondUpper) {
-          probabilities(secondIndex) += prob * second.probability(firstIndex, secondIndex)
-          secondIndex += secondStep
+          var secondIndex = secondLower
+          while (secondIndex <= secondUpper) {
+            probabilities(secondIndex) += prob * second.probability(firstIndex, secondIndex)
+            secondIndex += secondStep
+          }
         }
       }
 
@@ -98,5 +110,6 @@ class DoubleProbabilityVector(n: Int) extends ProbabilityVector {
     if (firstTime) {
       setBounds(1, 0)
     }
+    compact()
   }
 }

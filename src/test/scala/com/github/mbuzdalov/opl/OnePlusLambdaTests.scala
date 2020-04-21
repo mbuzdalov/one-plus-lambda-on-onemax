@@ -2,13 +2,13 @@ package com.github.mbuzdalov.opl
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
 import com.github.mbuzdalov.opl.computation.{DriftOptimalRunningTime, OptimalRunningTime}
+import com.github.mbuzdalov.opl.distribution.FlipKBits
 
 class OnePlusLambdaTests extends AnyFlatSpec with Matchers {
   private def optimalTimes(n: Int, lambda: Int): (Double, Double) = {
-    val optimalListener = OptimalRunningTime.newListener
-    val driftOptimalListener = DriftOptimalRunningTime.newListener
+    val optimalListener = OptimalRunningTime.newListener(FlipKBits)
+    val driftOptimalListener = DriftOptimalRunningTime.newListener(FlipKBits)
     OnePlusLambda(n, lambda, Seq(optimalListener, driftOptimalListener))
     (optimalListener.toResult.expectedRunningTime, driftOptimalListener.toResult.expectedRunningTime)
   }

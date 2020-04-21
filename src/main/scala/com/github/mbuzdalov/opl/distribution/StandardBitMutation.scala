@@ -2,6 +2,7 @@ package com.github.mbuzdalov.opl.distribution
 
 import com.github.mbuzdalov.opl.DoubleProbabilityVector
 import com.github.mbuzdalov.opl.MathEx.{logFactorial => lF}
+import com.github.mbuzdalov.opl.util.NumericMinimization
 
 object StandardBitMutation extends ParameterizedDistribution[Double] {
   override def initialize(n: Int, param: Double, target: DoubleProbabilityVector): Unit = {
@@ -21,5 +22,14 @@ object StandardBitMutation extends ParameterizedDistribution[Double] {
         i += 1
       }
     }
+  }
+
+  override def minimize(n: Int, fun: Double => Double): (Double, Double) = {
+    val atOne = fun(1.0)
+    val slideRight = atOne.isFinite
+    val result = NumericMinimization.ternarySearch(fun, 0.0, 1.0, 80, slideRight)
+
+    import scala.Ordering.Double.IeeeOrdering
+    Seq((1.0, atOne), (result, fun(result))).minBy(_._2)
   }
 }

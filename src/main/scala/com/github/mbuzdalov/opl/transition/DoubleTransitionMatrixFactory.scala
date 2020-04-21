@@ -30,6 +30,22 @@ object DoubleTransitionMatrixFactory extends TransitionMatrixFactory {
             sum += v
             k += 1
           }
+
+          if (target.head == 0 || target.last == 0) {
+            var ns = 0
+            while (ns < target.length && target(ns) == 0) ns += 1
+            var nt = target.length - 1
+            while (nt >= ns && target(nt) == 0) nt -= 1
+            if (ns <= nt) {
+              improveProbabilities(change) = java.util.Arrays.copyOfRange(target, ns, nt + 1)
+              lower(change) += ns
+              upper(change) -= target.length - 1 - nt
+              assert(upper(change) - lower(change) + 1 == improveProbabilities(change).length)
+            } else {
+              improveProbabilities(change) = null
+            }
+          }
+
           stayProbabilities(change) = 1 - sum
         } else {
           stayProbabilities(change) = 1
@@ -46,10 +62,10 @@ object DoubleTransitionMatrixFactory extends TransitionMatrixFactory {
 
     override def size: Int = n
     override def probability(change: Int, distance: Int): Double = {
-      if (distance > d)
-        0.0
-      else if (distance == d)
+      if (distance == d)
         stayProbabilities(change)
+      else if (distance > d || improveProbabilities(change) == null)
+        0.0
       else {
         // distance = d - 2 * okay + change => okay = (d - distance + change) / 2
         val okay2 = d - distance + change
