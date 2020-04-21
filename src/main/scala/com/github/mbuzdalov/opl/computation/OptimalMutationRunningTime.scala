@@ -18,8 +18,6 @@ object OptimalMutationRunningTime {
                                                     useShift: Boolean) extends ComputationResult[Double] {
     override def optimalParameter(distance: Int): Double = bestMutationProbability(distance - 1)
     override def optimalExpectation(distance: Int): Double = expectations(distance - 1)
-    override def optimalExpectationForBitFlips(distance: Int, flips: Int): Double =
-      (1 + conditionalExpectations(distance - 1)(flips - 1)) / updateProbabilities(distance - 1)(flips - 1)
     override def optimalExpectationForParameter(distance: Int, parameter: Double): Double =
       computeExpectedRunningTime(conditionalExpectations(distance - 1), updateProbabilities(distance - 1),
                                  parameter, useShift)

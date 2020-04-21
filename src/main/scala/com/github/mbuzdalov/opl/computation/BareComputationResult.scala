@@ -6,7 +6,6 @@ trait BareComputationResult {
   def problemSize: Int
   def populationSize: Int
   def optimalExpectation(distance: Int): Double
-  def optimalExpectationForBitFlips(distance: Int, flips: Int): Double
 
   lazy val expectedRunningTime: Double = {
     val n = problemSize
