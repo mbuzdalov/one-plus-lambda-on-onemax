@@ -1,13 +1,12 @@
 package com.github.mbuzdalov.opl
 
 import com.github.mbuzdalov.opl.computation.BareComputationListener
-import com.github.mbuzdalov.opl.transition.BoundedProbabilityFinder
+import com.github.mbuzdalov.opl.transition.DoubleProbabilityFinder
 
 object OnePlusLambda {
-  private val myFinder = BoundedProbabilityFinder
+  private val myFinder = DoubleProbabilityFinder
 
   def apply(n: Int, lambda: Int, listeners: Seq[BareComputationListener]): Unit = {
-    val space = myFinder.newAuxiliaryData(n)
     val probabilities = new Array[Double](n)
     listeners.foreach(_.startComputing(n, lambda))
     for (distance <- 1 to n) {
@@ -17,7 +16,7 @@ object OnePlusLambda {
         val lower = math.max((change + 1) / 2, change - n + distance)
         val upper = math.min(change, distance)
         if (lower <= upper) {
-          myFinder.find(n, lambda, distance, change, probabilities, space)
+          myFinder.find(n, distance, change, probabilities)
           for (okay <- lower to upper) {
             val newD = distance - 2 * okay + change
             val pi = probabilities(okay - lower)
