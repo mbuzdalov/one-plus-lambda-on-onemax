@@ -1,9 +1,10 @@
 package com.github.mbuzdalov.opl.transition
 
 import com.github.mbuzdalov.opl.MathEx.{logFactorial => lF}
+import com.github.mbuzdalov.opl.DoubleProbabilityVector
 
 object DoubleProbabilityFinder extends TransitionProbabilityFinder {
-  override def find(n: Int, d: Int, change: Int, target: TransitionProbabilities): Unit = {
+  override def find(n: Int, d: Int, change: Int, target: DoubleProbabilityVector): Unit = {
     val l = math.max(change / 2 + 1, change - n + d)
     val u = math.min(change, d)
     target.setBounds(l, u)

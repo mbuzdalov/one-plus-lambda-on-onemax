@@ -7,16 +7,16 @@ import org.scalatest.matchers.should.Matchers
 
 import com.github.mbuzdalov.opl.transition._
 
-class ProbabilityGenerationTests extends AnyFlatSpec with Matchers {
+class TransitionProbabilityFinderTests extends AnyFlatSpec with Matchers {
   private[this] val scaledEpsilon = 3e-14 // 2.2e-14 has once failed
 
-  def evaluate(n: Int, d: Int, change: Int, finder: TransitionProbabilityFinder): TransitionProbabilities = {
-    val target = new TransitionProbabilities(n)
+  def evaluate(n: Int, d: Int, change: Int, finder: TransitionProbabilityFinder): DoubleProbabilityVector = {
+    val target = new DoubleProbabilityVector(n)
     finder.find(n, d, change, target)
     target
   }
 
-  def computeMaxDiff(a: TransitionProbabilities, b: TransitionProbabilities): Double = {
+  def computeMaxDiff(a: DoubleProbabilityVector, b: DoubleProbabilityVector): Double = {
     var i = a.smallestDistance
     var result = 0.0
     while (i < a.largestDistance) {
