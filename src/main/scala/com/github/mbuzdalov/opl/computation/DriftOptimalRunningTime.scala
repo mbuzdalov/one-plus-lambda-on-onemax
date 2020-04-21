@@ -1,5 +1,7 @@
 package com.github.mbuzdalov.opl.computation
 
+import com.github.mbuzdalov.opl.{DoubleProbabilityVector, TransitionMatrix}
+
 object DriftOptimalRunningTime {
   def newListener: ComputationListener[Int] = new SizedDelegatingListener[Int]((n, l) => new Delegate(n, l))
 
@@ -10,7 +12,7 @@ object DriftOptimalRunningTime {
                                                  bestBitFlip: Array[Int],
                                                  bitFlipMatrix: Array[Array[Double]]) extends ComputationResult[Int] {
     override def optimalParameter(distance: Int): Int = bestBitFlip(distance - 1)
-    override def optimalExpectation(distance: Int): Double = expectations(distance - 1)
+    override def optimalExpectation(distance: Int): Double = expectations(distance)
 
     override def optimalExpectationForBitFlips(distance: Int, flips: Int): Double = bitFlipMatrix(distance - 1)(flips - 1)
     override def optimalExpectationForParameter(distance: Int, parameter: Int): Double =
@@ -18,48 +20,42 @@ object DriftOptimalRunningTime {
   }
 
   private class Delegate(problemSize: Int, populationSize: Int) extends ComputationListener[Int] {
-    private[this] val expectations, drifts, currDrifts = new Array[Double](problemSize)
+    private[this] val expectations = new Array[Double](problemSize + 1)
+    private[this] val drifts = new Array[Double](problemSize)
     private[this] val bestBitFlip = new Array[Int](problemSize)
     private[this] val bitFlipMatrix = Array.fill(problemSize, problemSize)(0.0)
-    private[this] val tracker = new ConditionalExpectationTracker(expectations)
+
+    private[this] val tmpVector = new DoubleProbabilityVector(problemSize)
+    private[this] val identity = Array.tabulate(problemSize + 1)(i => i.toDouble)
 
     override def startComputing(problemSize: Int, populationSize: Int): Unit =
       throw new IllegalStateException("Sizes are already set")
 
-    override def startDistance(distance: Int): Unit = {}
-
-    override def startTransitionProbabilityGroup(distance: Int, change: Int): Unit = {
-      tracker.reset()
-      currDrifts(change - 1) = 0
-    }
-
-    override def receiveTransitionProbability(change: Int, currDistance: Int, newDistance: Int, probability: Double): Unit = {
-      tracker.receiveProbability(newDistance, probability)
-      currDrifts(change - 1) += probability * (currDistance - newDistance)
-    }
-
-    override def finishTransitionProbabilityGroup(distance: Int, change: Int): Unit =
-      bitFlipMatrix(distance - 1)(change - 1) = (1 + tracker.getConditionalExpectation) / tracker.getUpdateProbability
-
-    override def finishDistance(distance: Int): Unit = {
-      var bestFlip = 0
-      var bestDrift = 0.0
-      var bestValue = Double.PositiveInfinity
-      var flip = 0
-      val bitFlipSlice = bitFlipMatrix(distance - 1)
-      while (flip < problemSize) {
-        val currD = currDrifts(flip)
-        val currV = bitFlipSlice(flip) // both intentionally before increment
-        flip += 1
-        if (bestDrift < currD) {
-          bestDrift = currD
-          bestValue = currV
-          bestFlip = flip
+    override def processDistance(distance: Int, matrix: TransitionMatrix): Unit = {
+      var change = 1
+      var bestChange = 0
+      var bestChangeValue = Double.PositiveInfinity
+      var bestChangeDrift = 0.0
+      while (change <= problemSize) {
+        val stayProbability = math.pow(matrix.probability(change, distance), populationSize)
+        matrix.extractToVector(change, tmpVector)
+        tmpVector.raiseToPowerWithExcessOnSuffix(populationSize)
+        val condExp = tmpVector.dotProduct(expectations)
+        val drift = distance * (1 - stayProbability) - tmpVector.dotProduct(identity)
+        val totalProb = tmpVector.sum
+        assert(math.abs(totalProb + stayProbability - 1) < 1e-9, s"total probability = $totalProb, stay probability = $stayProbability")
+        val changeExp = (1 + condExp) / (1 - stayProbability)
+        if (bestChangeDrift < drift) {
+          bestChangeDrift = drift
+          bestChangeValue = changeExp
+          bestChange = change
         }
+        bitFlipMatrix(distance - 1)(change - 1) = changeExp
+        change += 1
       }
-      expectations(distance - 1) = bestValue
-      bestBitFlip(distance - 1) = bestFlip
-      drifts(distance - 1) = bestDrift
+      expectations(distance) = bestChangeValue
+      drifts(distance - 1) = bestChangeDrift
+      bestBitFlip(distance - 1) = bestChange
     }
 
     override def toResult: ComputationResult[Int] =

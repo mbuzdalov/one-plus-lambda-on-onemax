@@ -1,5 +1,7 @@
 package com.github.mbuzdalov.opl.computation
 
+import com.github.mbuzdalov.opl.TransitionMatrix
+
 import scala.Ordering.Double.IeeeOrdering
 import scala.annotation.tailrec
 
@@ -32,27 +34,27 @@ object OptimalMutationRunningTime {
     override def startComputing(problemSize: Int, populationSize: Int): Unit =
       throw new IllegalStateException("Sizes are already set")
 
-    override def startDistance(distance: Int): Unit = {}
+    override def processDistance(distance: Int, matrix: TransitionMatrix): Unit = ???
 
-    override def startTransitionProbabilityGroup(distance: Int, change: Int): Unit =
-      tracker.reset()
-
-    override def receiveTransitionProbability(change: Int, currDistance: Int, newDistance: Int, probability: Double): Unit =
-      tracker.receiveProbability(newDistance, probability)
-
-    override def finishTransitionProbabilityGroup(distance: Int, change: Int): Unit = {
-      conditionalExpectations(distance - 1)(change - 1) = tracker.getConditionalExpectation
-      updateProbabilities(distance - 1)(change - 1) = tracker.getUpdateProbability
-    }
-
-    override def finishDistance(distance: Int): Unit = {
-      val condExp = conditionalExpectations(distance - 1)
-      val updProb = updateProbabilities(distance - 1)
-      val bestMutation = findBestMutationProbability(condExp, updProb, useShift)
-      bestMutationProbability(distance - 1) = bestMutation
-      expectations(distance - 1) = computeExpectedRunningTime(condExp, updProb, bestMutation, useShift)
-      assert(expectations(distance - 1).isFinite)
-    }
+//    override def startTransitionProbabilityGroup(distance: Int, change: Int): Unit =
+//      tracker.reset()
+//
+//    override def receiveTransitionProbability(change: Int, currDistance: Int, newDistance: Int, probability: Double): Unit =
+//      tracker.receiveProbability(newDistance, probability)
+//
+//    override def finishTransitionProbabilityGroup(distance: Int, change: Int): Unit = {
+//      conditionalExpectations(distance - 1)(change - 1) = tracker.getConditionalExpectation
+//      updateProbabilities(distance - 1)(change - 1) = tracker.getUpdateProbability
+//    }
+//
+//    override def finishDistance(distance: Int): Unit = {
+//      val condExp = conditionalExpectations(distance - 1)
+//      val updProb = updateProbabilities(distance - 1)
+//      val bestMutation = findBestMutationProbability(condExp, updProb, useShift)
+//      bestMutationProbability(distance - 1) = bestMutation
+//      expectations(distance - 1) = computeExpectedRunningTime(condExp, updProb, bestMutation, useShift)
+//      assert(expectations(distance - 1).isFinite)
+//    }
 
     override def toResult: ComputationResult[Double] =
       new Result(problemSize, populationSize, expectations, bestMutationProbability,
