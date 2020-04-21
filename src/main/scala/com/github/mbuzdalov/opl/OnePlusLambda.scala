@@ -1,25 +1,25 @@
 package com.github.mbuzdalov.opl
 
 import com.github.mbuzdalov.opl.computation.BareComputationListener
-import com.github.mbuzdalov.opl.transition.DoubleProbabilityFinder
+import com.github.mbuzdalov.opl.transition.{DoubleProbabilityFinder, TransitionProbabilities}
 
 object OnePlusLambda {
   private val myFinder = DoubleProbabilityFinder
 
   def apply(n: Int, lambda: Int, listeners: Seq[BareComputationListener]): Unit = {
-    val probabilities = new Array[Double](n)
+    val probabilities = new TransitionProbabilities(n)
     listeners.foreach(_.startComputing(n, lambda))
     for (distance <- 1 to n) {
       listeners.foreach(_.startDistance(distance))
       for (change <- 1 to n) {
         listeners.foreach(_.startTransitionProbabilityGroup(distance, change))
-        val lower = math.max(change / 2 + 1, change - n + distance)
-        val upper = math.min(change, distance)
-        if (lower <= upper) {
-          myFinder.find(n, distance, change, probabilities)
+        myFinder.find(n, distance, change, probabilities)
+        if (probabilities.nonEmpty) {
+          val lower = probabilities.smallestDistance
+          val upper = probabilities.largestDistance
           for (okay <- lower to upper) {
             val newD = distance - 2 * okay + change
-            val pi = probabilities(okay - lower)
+            val pi = probabilities.probability(okay)
             assert(newD < distance, s"n = $n, distance = $distance, change = $change, lower = $lower, upper = $upper, okay = $okay")
             listeners.foreach(_.receiveTransitionProbability(change, distance, newD, pi))
           }

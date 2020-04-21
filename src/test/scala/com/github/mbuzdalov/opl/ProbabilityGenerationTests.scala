@@ -2,8 +2,6 @@ package com.github.mbuzdalov.opl
 
 import java.util.concurrent.ThreadLocalRandom
 
-import scala.Ordering.Double.IeeeOrdering
-
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -12,26 +10,29 @@ import com.github.mbuzdalov.opl.transition._
 class ProbabilityGenerationTests extends AnyFlatSpec with Matchers {
   private[this] val scaledEpsilon = 3e-14 // 2.2e-14 has once failed
 
-  def evaluate(n: Int, d: Int, change: Int, finder: TransitionProbabilityFinder): Array[Double] = {
-    val lower = math.max((change + 1) / 2, change - n + d)
-    val upper = math.min(change, d)
-    if (lower <= upper) {
-      val target = new Array[Double](upper - lower + 1)
-      finder.find(n, d, change, target)
-      target
-    } else {
-      new Array(0)
-    }
+  def evaluate(n: Int, d: Int, change: Int, finder: TransitionProbabilityFinder): TransitionProbabilities = {
+    val target = new TransitionProbabilities(n)
+    finder.find(n, d, change, target)
+    target
   }
 
-  def computeMaxDiff(a: Array[Double], b: Array[Double]): Double = a.indices.view.map(i => math.abs(a(i) - b(i))).max
+  def computeMaxDiff(a: TransitionProbabilities, b: TransitionProbabilities): Double = {
+    var i = a.smallestDistance
+    var result = 0.0
+    while (i < a.largestDistance) {
+      result = math.max(result, math.abs(a.probability(i) - b.probability(i)))
+      i += 1
+    }
+    result
+  }
 
   def validate(n: Int, d: Int, change: Int): Unit = {
     val big = evaluate(n, d, change, BigDecimalProbabilityFinder)
     val dbl = evaluate(n, d, change, DoubleProbabilityFinder)
     val epsilon = scaledEpsilon * n
-    assert(big.length == dbl.length)
-    if (big.length > 0) {
+    assert(big.smallestDistance == dbl.smallestDistance)
+    assert(big.largestDistance == dbl.largestDistance)
+    if (big.nonEmpty) {
       val maxDiff = computeMaxDiff(big, dbl)
       assert(maxDiff <= epsilon)
     }
