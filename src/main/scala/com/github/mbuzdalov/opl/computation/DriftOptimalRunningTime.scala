@@ -15,11 +15,11 @@ object DriftOptimalRunningTime {
                                          distribution: ParameterizedDistribution[P],
                                          optionalCallbackWrapper: Option[callback.Wrapper[P]])
                                         (implicit classTag: ClassTag[P]) extends ComputationListener[P] {
-    private[this] val expectations = new Array[Double](problemSize + 1)
-    private[this] val bestParameter = new Array[P](problemSize)
+    private val expectations = new Array[Double](problemSize + 1)
+    private val bestParameter = new Array[P](problemSize)
 
-    private[this] val flipVector, distanceVector = new DoubleProbabilityVector(problemSize)
-    private[this] val identity = Array.tabulate(problemSize + 1)(i => i.toDouble)
+    private val flipVector, distanceVector = new DoubleProbabilityVector(problemSize)
+    private val identity = Array.tabulate(problemSize + 1)(i => i.toDouble)
 
     override def startComputing(problemSize: Int, populationSize: Int): Unit =
       throw new IllegalStateException("Sizes are already set")
