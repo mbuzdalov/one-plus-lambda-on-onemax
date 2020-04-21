@@ -5,7 +5,7 @@ import spire.implicits._
 
 object BigDecimalProbabilityFinder extends TransitionProbabilityFinder {
   override def find(n: Int, d: Int, change: Int, target: Array[Double]): Unit = {
-    val l = math.max((change + 1) / 2, change - n + d)
+    val l = math.max(change / 2 + 1, change - n + d)
     val u = math.min(change, d)
 
     val common = lF(d) + lF(n - d) - lF(n) + lF(change) + lF(n - change)

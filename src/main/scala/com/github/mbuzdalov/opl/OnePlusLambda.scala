@@ -13,16 +13,15 @@ object OnePlusLambda {
       listeners.foreach(_.startDistance(distance))
       for (change <- 1 to n) {
         listeners.foreach(_.startTransitionProbabilityGroup(distance, change))
-        val lower = math.max((change + 1) / 2, change - n + distance)
+        val lower = math.max(change / 2 + 1, change - n + distance)
         val upper = math.min(change, distance)
         if (lower <= upper) {
           myFinder.find(n, distance, change, probabilities)
           for (okay <- lower to upper) {
             val newD = distance - 2 * okay + change
             val pi = probabilities(okay - lower)
-            if (newD < distance) { // WTF? Should not be like this. The entire `transition` package should be updated
-              listeners.foreach(_.receiveTransitionProbability(change, distance, newD, pi))
-            }
+            assert(newD < distance, s"n = $n, distance = $distance, change = $change, lower = $lower, upper = $upper, okay = $okay")
+            listeners.foreach(_.receiveTransitionProbability(change, distance, newD, pi))
           }
         }
         listeners.foreach(_.finishTransitionProbabilityGroup(distance, change))
