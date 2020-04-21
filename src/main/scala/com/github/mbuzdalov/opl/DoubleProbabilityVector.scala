@@ -70,28 +70,33 @@ class DoubleProbabilityVector(n: Int) extends ProbabilityVector {
       val secondUpper = second.maxDistance(firstIndex)
       val secondStep = second.stepDistance(firstIndex)
 
-      if (firstTime) {
-        firstTime = false
-        setBounds(secondLower, secondUpper)
-        JArrays.fill(probabilities, secondLower, secondUpper + 1, 0.0)
-      } else {
-        if (lower > secondLower) {
-          JArrays.fill(probabilities, secondLower, lower, 0.0)
-          lower = secondLower
+      if (secondLower <= secondUpper) {
+        if (firstTime) {
+          firstTime = false
+          setBounds(secondLower, secondUpper)
+          JArrays.fill(probabilities, secondLower, secondUpper + 1, 0.0)
+        } else {
+          if (lower > secondLower) {
+            JArrays.fill(probabilities, secondLower, lower, 0.0)
+            lower = secondLower
+          }
+          if (upper < secondUpper) {
+            JArrays.fill(probabilities, upper + 1, secondUpper + 1, 0.0)
+            upper = secondUpper
+          }
         }
-        if (upper < secondUpper) {
-          JArrays.fill(probabilities, upper + 1, secondUpper + 1, 0.0)
-          upper = secondUpper
-        }
-      }
 
-      var secondIndex = secondLower
-      while (secondIndex <= secondUpper) {
-        probabilities(secondIndex) += prob * second.probability(firstIndex, secondIndex)
-        secondIndex += secondStep
+        var secondIndex = secondLower
+        while (secondIndex <= secondUpper) {
+          probabilities(secondIndex) += prob * second.probability(firstIndex, secondIndex)
+          secondIndex += secondStep
+        }
       }
 
       firstIndex += 1
+    }
+    if (firstTime) {
+      setBounds(1, 0)
     }
   }
 }
