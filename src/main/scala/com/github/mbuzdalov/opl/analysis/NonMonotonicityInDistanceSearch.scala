@@ -8,20 +8,17 @@ import scala.collection.mutable.ArrayBuffer
 import scala.util.Using
 
 class NonMonotonicityInDistanceSearch(path: Path) extends Callback[Int] with AutoCloseable {
-  private var prevBestParameter: Int = _
-  private var prevBestValue: Double = Double.PositiveInfinity
+  private var prevBestParameter: Int = 0
+  private var prevBestValue: Double = Double.NegativeInfinity
   private val strangeness = new ArrayBuffer[Problem]()
 
   override def callBack(distance: Int, parameters: Array[Int], values: Array[Double], bestParameter: Int, bestValue: Double): Unit = {
-    if (prevBestValue.isInfinity) {
-      prevBestParameter = bestParameter
-      prevBestValue = bestValue
-    } else {
-      if (prevBestParameter > bestParameter) {
-        val prevBestIndex = parameters.indexOf(prevBestParameter)
-        strangeness += Problem(distance, prevBestParameter, bestParameter, bestValue, values(prevBestIndex))
-      }
+    if (prevBestParameter > bestParameter) {
+      val prevBestIndex = parameters.indexOf(prevBestParameter)
+      strangeness += Problem(distance, prevBestParameter, bestParameter, bestValue, values(prevBestIndex))
     }
+    prevBestParameter = bestParameter
+    prevBestValue = bestValue
   }
 
   override def close(): Unit = {
