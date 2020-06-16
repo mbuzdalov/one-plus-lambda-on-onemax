@@ -23,5 +23,5 @@ in a single mutation.
 
 # Highlights
 
-1. The best number of bit flips, as a function of distance to the optimum, is **NOT** monotone unlike the (1+1) randomized local search.
+1. The best number of bit flips, as a function of distance to the optimum, is **NOT** monotone for large enough population sizes, unlike the standard (1+1) randomized local search.
 2. The runtime as a function of the mutation probability is **NOT** unimodal in the (1+λ) EA with the shift bit mutation.
