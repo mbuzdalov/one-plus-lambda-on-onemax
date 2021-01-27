@@ -4,7 +4,8 @@ This repository contributes to parameter analysis
 of various flavours of the (1+λ) EA on the OneMax problem.
 It accompanies the following paper:
 
-Buzdalov M., Doerr C. Optimal Mutation Rates for the (1+λ) EA on OneMax // Parallel Problem Solving from Nature XVI -- 2020 -- Accepted for publication
+Buzdalov M., Doerr C. Optimal Mutation Rates for the (1+λ) EA on OneMax
+// Parallel Problem Solving from Nature XVI -- 2020 -- P.574-587 -- Lecture Notes in Computer Science, no. 12270.
 
 # Motivation
 
