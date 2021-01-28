@@ -9,7 +9,7 @@ class OnePlusLambdaTests extends AnyFlatSpec with Matchers {
   private def optimalTimes(n: Int, lambda: Int): (Double, Double) = {
     val optimalListener = OptimalRunningTime.newListener(FlipKBits)
     val driftOptimalListener = DriftOptimalRunningTime.newListener(FlipKBits)
-    OnePlusLambda(n, lambda, Seq(optimalListener, driftOptimalListener))
+    OnePlusLambda(n, lambda, Seq(optimalListener, driftOptimalListener), printTimings = false)
     (optimalListener.toResult.expectedRunningTime, driftOptimalListener.toResult.expectedRunningTime)
   }
 

@@ -30,7 +30,9 @@ object Main {
         t0.done()
 
         val t1 = timer(s"[n=$n, lambda=$lambda] Running (1+lambda)...")
-        OnePlusLambda(n, lambda, Seq(optimalListener, driftOptimalListener, standardOptimalListener, shiftOptimalListener))
+        OnePlusLambda(n, lambda,
+          Seq(optimalListener, driftOptimalListener, standardOptimalListener, shiftOptimalListener),
+          printTimings = true)
         val optimalResult = optimalListener.toResult
         val driftOptimalResult = driftOptimalListener.toResult
         val standardOptimalResult = standardOptimalListener.toResult
@@ -98,7 +100,9 @@ object Main {
                 t0.done()
 
                 val t1 = timer(s"[n=$n, lambda=$lambda] Running (1+lambda)...")
-                OnePlusLambda(n, lambda, Seq(optimalListener, optimalStandardListener, optimalShiftListener, driftOptimalListener))
+                OnePlusLambda(n, lambda,
+                  Seq(optimalListener, optimalStandardListener, optimalShiftListener, driftOptimalListener),
+                  printTimings = true)
                 t1.done()
 
                 val optimalRLS = optimalListener.toResult
