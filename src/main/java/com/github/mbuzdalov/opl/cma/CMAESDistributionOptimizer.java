@@ -157,20 +157,18 @@ public class CMAESDistributionOptimizer {
 
             // generate random offspring
             for (int k = 0; k < populationSize; k++) {
-                RealMatrix arxk = null;
                 for (int i = 0; i <= nResamplingUntilFeasible; i++) {
                     if (nDiagonalOnlyIterations <= iterations) {
-                        arxk = xmean.add(BD.multiply(arz.getColumnMatrix(k)).scalarMultiply(sigma));
+                        arx.setColumnMatrix(k, xmean.add(BD.multiply(arz.getColumnMatrix(k)).scalarMultiply(sigma)));
                     } else {
-                        arxk = xmean.add(times(diagD,arz.getColumnMatrix(k)).scalarMultiply(sigma));
+                        arx.setColumnMatrix(k, xmean.add(times(diagD, arz.getColumnMatrix(k)).scalarMultiply(sigma)));
                     }
-                    if (i >= nResamplingUntilFeasible || isFeasible(arxk.getColumn(0))) {
+                    if (i >= nResamplingUntilFeasible || isFeasible(arx.getColumn(k))) {
                         break;
                     }
                     // regenerate random arguments for row
                     arz.setColumn(k, gaussianArray(dimension));
                 }
-                copyZeroColumn(arxk, arx, k);
                 double[] rawIndividual = arx.getColumn(k);
                 fixedIndividuals[k] = repair(rawIndividual);
                 penalties[k] = penalty(rawIndividual, fixedIndividuals[k]);
@@ -583,12 +581,6 @@ public class CMAESDistributionOptimizer {
                 d[i][0] = m.getEntry(i, i);
             }
             return new Array2DRowRealMatrix(d, false);
-        }
-    }
-
-    private static void copyZeroColumn(final RealMatrix m1, RealMatrix m2, int col2) {
-        for (int i = 0; i < m1.getRowDimension(); i++) {
-            m2.setEntry(i, col2, m1.getEntry(i, 0));
         }
     }
 
