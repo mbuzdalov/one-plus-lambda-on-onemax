@@ -124,7 +124,7 @@ object OptimalStaticDistribution {
     normalize(initialGuess)
 
     val optimizer = new CMAESOptimizer(100 * n * n, 0, true, 10,
-      10, rng, false)
+      10, rng)
     val result = optimizer.optimize(new ObjectiveFunction(objectiveFunction), new InitialGuess(initialGuess),
       GoalType.MINIMIZE, new CMAESOptimizer.PopulationSize(10),
       new CMAESOptimizer.Sigma(Array.fill(n)(1)), new SimpleBounds(Array.fill(n)(0), Array.fill(n)(1)),

@@ -1,5 +1,7 @@
 package com.github.mbuzdalov.opl.cma;
 
+import java.util.Arrays;
+
 import org.apache.commons.math3.analysis.MultivariateFunction;
 import org.apache.commons.math3.exception.*;
 import org.apache.commons.math3.linear.Array2DRowRealMatrix;
@@ -12,10 +14,6 @@ import org.apache.commons.math3.optim.nonlinear.scalar.ObjectiveFunction;
 import org.apache.commons.math3.random.RandomGenerator;
 import org.apache.commons.math3.util.FastMath;
 import org.apache.commons.math3.util.MathArrays;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 public class CMAESOptimizer {
     // from BaseOptimizer
@@ -146,8 +144,6 @@ public class CMAESOptimizer {
     private int diagonalOnly;
     /** Number of objective variables/problem dimension */
     private boolean isMinimize = true;
-    /** Indicates whether statistic data is collected. */
-    private final boolean generateStatistics;
 
     // termination criteria
     /** Maximal number of iterations allowed. */
@@ -225,15 +221,6 @@ public class CMAESOptimizer {
     /** Random generator. */
     private final RandomGenerator random;
 
-    /** History of sigma values. */
-    private final List<Double> statisticsSigmaHistory = new ArrayList<Double>();
-    /** History of mean matrix. */
-    private final List<RealMatrix> statisticsMeanHistory = new ArrayList<RealMatrix>();
-    /** History of fitness values. */
-    private final List<Double> statisticsFitnessHistory = new ArrayList<Double>();
-    /** History of D matrix. */
-    private final List<RealMatrix> statisticsDHistory = new ArrayList<RealMatrix>();
-
     /**
      * @param maxIterations Maximal number of iterations.
      * @param stopFitness Whether to stop if objective function value is smaller than
@@ -244,7 +231,6 @@ public class CMAESOptimizer {
      * @param checkFeasableCount Determines how often new random objective variables are
      * generated in case they are out of bounds.
      * @param random Random generator.
-     * @param generateStatistics Whether statistic data is collected.
      *
      * @since 3.1
      */
@@ -253,43 +239,13 @@ public class CMAESOptimizer {
                           boolean isActiveCMA,
                           int diagonalOnly,
                           int checkFeasableCount,
-                          RandomGenerator random,
-                          boolean generateStatistics) {
+                          RandomGenerator random) {
         this.maxIterations = maxIterations;
         this.stopFitness = stopFitness;
         this.isActiveCMA = isActiveCMA;
         this.diagonalOnly = diagonalOnly;
         this.checkFeasableCount = checkFeasableCount;
         this.random = random;
-        this.generateStatistics = generateStatistics;
-    }
-
-    /**
-     * @return History of sigma values.
-     */
-    public List<Double> getStatisticsSigmaHistory() {
-        return statisticsSigmaHistory;
-    }
-
-    /**
-     * @return History of mean matrix.
-     */
-    public List<RealMatrix> getStatisticsMeanHistory() {
-        return statisticsMeanHistory;
-    }
-
-    /**
-     * @return History of fitness values.
-     */
-    public List<Double> getStatisticsFitnessHistory() {
-        return statisticsFitnessHistory;
-    }
-
-    /**
-     * @return History of D matrix.
-     */
-    public List<RealMatrix> getStatisticsDHistory() {
-        return statisticsDHistory;
     }
 
     /**
@@ -492,12 +448,6 @@ public class CMAESOptimizer {
             }
             // store best in history
             push(fitnessHistory,bestFitness);
-            if (generateStatistics) {
-                statisticsSigmaHistory.add(sigma);
-                statisticsFitnessHistory.add(bestFitness);
-                statisticsMeanHistory.add(xmean.transpose());
-                statisticsDHistory.add(diagD.transpose().scalarMultiply(1E5));
-            }
         }
         return optimum;
     }
