@@ -1,10 +1,9 @@
 package com.github.mbuzdalov.opl.cma;
 
 import java.util.Arrays;
+import java.util.function.Function;
 
-import org.apache.commons.math3.analysis.MultivariateFunction;
 import org.apache.commons.math3.exception.NotStrictlyPositiveException;
-import org.apache.commons.math3.exception.TooManyEvaluationsException;
 import org.apache.commons.math3.linear.Array2DRowRealMatrix;
 import org.apache.commons.math3.linear.EigenDecomposition;
 import org.apache.commons.math3.linear.MatrixUtils;
@@ -17,7 +16,7 @@ import org.apache.commons.math3.util.MathArrays;
 public class CMAESDistributionOptimizer {
     private final int populationSize;
     private final int dimension;
-    private final MultivariateFunction function;
+    private final Function<double[][], double[]> function;
 
     /**
      * Covariance update mechanism, default is active CMA. isActiveCMA = true
@@ -121,7 +120,7 @@ public class CMAESDistributionOptimizer {
                                       RandomGenerator random,
                                       int dimension,
                                       int populationSize,
-                                      MultivariateFunction function) {
+                                      Function<double[][], double[]> function) {
         if (populationSize <= 0) {
             throw new NotStrictlyPositiveException(populationSize);
         }
@@ -149,8 +148,8 @@ public class CMAESDistributionOptimizer {
         }
         initializeCMA(guess);
         iterations = 0;
-        ValuePenaltyPair valuePenalty = valueAndPenalty(guess);
-        double bestValue = valuePenalty.value + valuePenalty.penalty;
+        double[] fixedGuess = repair(guess);
+        double bestValue = function.apply(new double[][] {fixedGuess})[0] + penalty(guess, fixedGuess);
         push(fitnessHistory, bestValue);
         PointValuePair optimum = new PointValuePair(guess, bestValue);
 
@@ -162,7 +161,9 @@ public class CMAESDistributionOptimizer {
             final RealMatrix arz = randn1(dimension, populationSize);
             final RealMatrix arx = zeros(dimension, populationSize);
             final double[] fitness = new double[populationSize];
-            final ValuePenaltyPair[] valuePenaltyPairs = new ValuePenaltyPair[populationSize];
+            final double[][] fixedIndividuals = new double[populationSize][];
+            final double[] penalties = new double[populationSize];
+
             // generate random offspring
             for (int k = 0; k < populationSize; k++) {
                 RealMatrix arxk = null;
@@ -181,13 +182,15 @@ public class CMAESDistributionOptimizer {
                     arz.setColumn(k, randn(dimension));
                 }
                 copyColumn(arxk, 0, arx, k);
-                valuePenaltyPairs[k] = valueAndPenalty(arx.getColumn(k)); // compute fitness
+                double[] rawIndividual = arx.getColumn(k);
+                fixedIndividuals[k] = repair(rawIndividual);
+                penalties[k] = penalty(rawIndividual, fixedIndividuals[k]);
             }
 
-            // Compute fitnesses by adding value and penalty after scaling by value range.
-            double valueRange = valueRange(valuePenaltyPairs);
-            for (int iValue=0;iValue<valuePenaltyPairs.length;iValue++) {
-                fitness[iValue] = valuePenaltyPairs[iValue].value + valuePenaltyPairs[iValue].penalty*valueRange;
+            double[] rawFitness = function.apply(fixedIndividuals);
+            double valueRange = max(rawFitness) - min(rawFitness);
+            for (int i = 0; i < populationSize; ++i) {
+                fitness[i] = rawFitness[i] + penalties[i] * valueRange;
             }
 
             // Sort by fitness and compute weighted mean into xmean
@@ -508,25 +511,6 @@ public class CMAESDistributionOptimizer {
         }
         return indices;
     }
-    /**
-     * Get range of values.
-     *
-     * @param vpPairs Array of valuePenaltyPairs to get range from.
-     * @return a double equal to maximum value minus minimum value.
-     */
-    private double valueRange(final ValuePenaltyPair[] vpPairs) {
-        double max = Double.NEGATIVE_INFINITY;
-        double min = Double.MAX_VALUE;
-        for (ValuePenaltyPair vpPair:vpPairs) {
-            if (vpPair.value > max) {
-                max = vpPair.value;
-            }
-            if (vpPair.value < min) {
-                min = vpPair.value;
-            }
-        }
-        return max-min;
-    }
 
     /**
      * Used to sort fitness values. Sorting is always in lower value first
@@ -574,31 +558,6 @@ public class CMAESDistributionOptimizer {
             return (int) (1438542 ^ bits >>> 32 ^ bits);
         }
     }
-    /**
-     * Stores the value and penalty (for repair of out of bounds point).
-     */
-    private static class ValuePenaltyPair {
-        /** Objective function value. */
-        private final double value;
-        /** Penalty value for repair of out out of bounds points. */
-        private final double penalty;
-
-        /**
-         * @param value Function value.
-         * @param penalty Out-of-bounds penalty.
-         */
-        ValuePenaltyPair(final double value, final double penalty) {
-            this.value   = value;
-            this.penalty = penalty;
-        }
-    }
-
-    private ValuePenaltyPair valueAndPenalty(final double[] point) {
-        double[] repaired = repair(point);
-        double value = function.value(repaired);
-        double penalty = penalty(point, repaired);
-        return new ValuePenaltyPair(value,penalty);
-    }
 
     private static boolean isFeasible(final double[] x) {
         for (double v : x) {
@@ -610,12 +569,12 @@ public class CMAESDistributionOptimizer {
     }
 
     private static double[] repair(final double[] x) {
-        final double[] repaired = new double[x.length];
-        for (int i = 0; i < x.length; i++) {
-            if (x[i] < 0) {
+        final double[] repaired = x.clone();
+        for (int i = 0; i < repaired.length; i++) {
+            if (repaired[i] < 0) {
                 repaired[i] = 0;
-            } else {
-                repaired[i] = Math.min(x[i], 1);
+            } else if (repaired[i] > 1) {
+                repaired[i] = 1;
             }
         }
         return repaired;

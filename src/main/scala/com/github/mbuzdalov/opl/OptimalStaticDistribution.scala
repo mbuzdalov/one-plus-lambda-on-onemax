@@ -1,70 +1,18 @@
 package com.github.mbuzdalov.opl
 
 import java.io.PrintWriter
-import java.util.concurrent.locks.ReentrantLock
-import java.util.concurrent.{Callable, ConcurrentLinkedDeque, CountDownLatch, Executors}
+import java.util.concurrent.{Callable, Executors}
 
-import scala.annotation.tailrec
 import scala.util.Using
 
-import org.apache.commons.math3.analysis.MultivariateFunction
 import org.apache.commons.math3.random.{MersenneTwister, RandomGenerator}
 
 import com.github.mbuzdalov.opl.cma.CMAESDistributionOptimizer
-import com.github.mbuzdalov.opl.computation.{BareComputationListener, OptimalRunningTime}
+import com.github.mbuzdalov.opl.computation.OptimalRunningTime
 import com.github.mbuzdalov.opl.distribution.ParameterizedDistribution
 
 
 object OptimalStaticDistribution {
-  private class LatchWrapper(val latch: CountDownLatch, var done: Boolean) {
-    def markDone(): Unit = {
-      done = true
-      latch.countDown()
-    }
-  }
-
-  private class OnePlusLambdaServer(n: Int, lambda: Int) {
-    private val entryLock = new ReentrantLock()
-    private val sequence = new ConcurrentLinkedDeque[(BareComputationListener, LatchWrapper)]()
-
-    @tailrec
-    final def compute(listener: BareComputationListener): Unit = {
-      if (entryLock.tryLock()) {
-        val sequenceToEvaluate = IndexedSeq.newBuilder[BareComputationListener]
-        val sequenceToNotify = IndexedSeq.newBuilder[LatchWrapper]
-        sequenceToEvaluate += listener
-        var nextPair = sequence.poll()
-        while (nextPair != null) {
-          sequenceToEvaluate += nextPair._1
-          sequenceToNotify += nextPair._2
-          nextPair = sequence.poll()
-        }
-        val theSequence = sequenceToEvaluate.result()
-        OnePlusLambda(n, lambda, theSequence, printTimings = false)
-        sequenceToNotify.result().foreach(_.markDone())
-        entryLock.unlock()
-        val late = sequence.poll()
-        if (late != null) {
-          late._2.latch.countDown() // as we polled it, it is not done, so give it a chance to work on its own
-        }
-      } else {
-        val myLatch = new LatchWrapper(new CountDownLatch(1), false)
-        sequence.add((listener, myLatch))
-        myLatch.latch.await()
-        if (!myLatch.done) compute(listener)
-      }
-    }
-  }
-
-  private val servers = new scala.collection.mutable.HashMap[(Int, Int), OnePlusLambdaServer]
-  private def runOnServer(n: Int, lambda: Int, listener: BareComputationListener): Unit = {
-    val myServer = servers.synchronized {
-      val key = (n, lambda)
-      servers.getOrElseUpdate(key, new OnePlusLambdaServer(n, lambda))
-    }
-    myServer.compute(listener)
-  }
-
   private class FixedDistribution(distribution: Array[Double]) extends ParameterizedDistribution[Unit] {
     override def minimize(n: Int, fun: Unit => Double): (Unit, Double) = {} -> fun({})
     override def initialize(n: Int, param: Unit, target: DoubleProbabilityVector): Unit = {
@@ -79,27 +27,29 @@ object OptimalStaticDistribution {
     }
   }
 
-  private class FitnessFunction(lambda: Int) extends MultivariateFunction {
+  private class FitnessFunction(lambda: Int) {
     private[this] var nCalls = 0
     private[this] var bestFitness = Double.PositiveInfinity
     private[this] var lastUpdate = 0
     private[this] val fitnessSequence = IndexedSeq.newBuilder[(Int, Double)]
 
-    override def value(distribution: Array[Double]): Double = {
-      val n = distribution.length
-      val timeForDistributionListener = OptimalRunningTime.newListener(new FixedDistribution(distribution))
-      runOnServer(n, lambda, timeForDistributionListener)
-      val result = timeForDistributionListener.toResult.expectedRunningTime
-      nCalls += 1
-      if (bestFitness > result) {
-        if (lastUpdate < nCalls - 1)
-          if (bestFitness.isFinite)
-            fitnessSequence += (nCalls - 1) -> bestFitness
-        lastUpdate = nCalls
-        bestFitness = result
-        fitnessSequence += nCalls -> bestFitness
+    def evaluate(distributions: Array[Array[Double]]): Array[Double] = {
+      val n = distributions(0).length
+      val listeners = distributions.map(d => OptimalRunningTime.newListener(new FixedDistribution(d)))
+      OnePlusLambda(n, lambda, listeners, printTimings = false)
+      val results = listeners.map(_.toResult.expectedRunningTime)
+      for (result <- results) {
+        nCalls += 1
+        if (bestFitness > result) {
+          if (lastUpdate < nCalls - 1)
+            if (bestFitness.isFinite)
+              fitnessSequence += (nCalls - 1) -> bestFitness
+          lastUpdate = nCalls
+          bestFitness = result
+          fitnessSequence += nCalls -> bestFitness
+        }
       }
-      result
+      results
     }
 
     def sequence: IndexedSeq[(Int, Double)] = fitnessSequence.result()
@@ -119,7 +69,7 @@ object OptimalStaticDistribution {
   def findOptimalDistribution(n: Int, lambda: Int, rng: RandomGenerator): RunResult = {
     val objectiveFunction = new FitnessFunction(lambda)
 
-    val optimizer = new CMAESDistributionOptimizer(100 * n * n, true, 10, 10, rng, n, 10, objectiveFunction)
+    val optimizer = new CMAESDistributionOptimizer(100 * n * n, true, 10, 10, rng, n, 10, a => objectiveFunction.evaluate(a))
     val result = optimizer.optimize()
 
     val finalDistribution = result.getPoint
@@ -141,7 +91,7 @@ object OptimalStaticDistribution {
   def main(args: Array[String]): Unit = {
     val n = args(0).toInt
 
-    val executor = Executors.newFixedThreadPool(50)
+    val executor = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors())
 
     Using.resources(
       new PrintWriter(s"static-$n-fitness-log.csv"),
