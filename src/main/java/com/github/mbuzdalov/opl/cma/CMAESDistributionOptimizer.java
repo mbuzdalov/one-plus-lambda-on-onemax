@@ -14,105 +14,60 @@ import org.apache.commons.math3.util.FastMath;
 import org.apache.commons.math3.util.MathArrays;
 
 public class CMAESDistributionOptimizer {
+    // Main user input parameters.
     private final int populationSize;
     private final int dimension;
     private final Function<double[][], double[]> function;
 
-    /**
-     * Covariance update mechanism, default is active CMA. isActiveCMA = true
-     * turns on "active CMA" with a negative update of the covariance matrix and
-     * checks for positive definiteness. OPTS.CMA.active = 2 does not check for
-     * pos. def. and is numerically faster. Active CMA usually speeds up the
-     * adaptation.
-     */
+    // Other configuration parameters.
     private final boolean isActiveCMA;
-    /**
-     * Determines how often a new random offspring is generated in case it is
-     * not feasible / beyond the defined limits, default is 0.
-     */
     private final int nResamplingUntilFeasible;
-
-    private int nDiagonalOnlyIterations;
-
-    // termination criteria
-    /** Maximal number of iterations allowed. */
+    private final int nDiagonalOnlyIterations;
     private final int maxIterations;
-    /** Stop if x-changes larger stopTolUpX. */
-    private double stopTolUpX;
-    /** Stop if x-change smaller stopTolX. */
-    private double stopTolX;
-    /** Stop if fun-changes smaller stopTolFun. */
-    private double stopTolFun;
-    /** Stop if back fun-changes smaller stopTolHistFun. */
-    private double stopTolHistFun;
 
-    // selection strategy parameters
-    /** Number of parents/points for recombination. */
-    private int mu; //
-    /** Array for weighted recombination. */
-    private RealMatrix weights;
-    /** Variance-effectiveness of sum w_i x_i. */
-    private double mueff; //
+    // Internal termination criteria.
+    private final double stopTolUpX;
+    private final double stopTolX;
+    private final double stopTolFun;
+    private final double stopTolHistFun;
 
-    // dynamic strategy parameters and constants
-    /** Overall standard deviation - search volume. */
-    private double sigma;
-    /** Cumulation constant. */
-    private double cc;
-    /** Cumulation constant for step-size. */
-    private double cs;
-    /** Damping for step-size. */
-    private double damps;
-    /** Learning rate for rank-one update. */
-    private double ccov1;
-    /** Learning rate for rank-mu update' */
-    private double ccovmu;
-    /** Expectation of ||N(0,I)|| == norm(randn(N,1)). */
-    private double chiN;
-    /** Learning rate for rank-one update - diagonalOnly */
-    private double ccov1Sep;
-    /** Learning rate for rank-mu update - diagonalOnly */
-    private double ccovmuSep;
+    // Fixed auto-inferred parameters.
+    private final int mu;
+    private final RealMatrix weights;
+    private final double mueff;
+    private final double cc;
+    private final double cs;
+    private final double damps;
+    private final double ccov1;
+    private final double ccovmu;
+    private final double chiN;
+    private final double ccov1Sep;
+    private final double ccovmuSep;
 
-    // CMA internal values - updated each generation
-    /** Objective variables. */
-    private RealMatrix xmean;
-    /** Evolution path. */
-    private RealMatrix pc;
-    /** Evolution path for sigma. */
-    private RealMatrix ps;
-    /** Norm of ps, stored for efficiency. */
-    private double normps;
-    /** Coordinate system. */
-    private RealMatrix B;
-    /** Scaling. */
-    private RealMatrix D;
-    /** B*D, stored for efficiency. */
-    private RealMatrix BD;
-    /** Diagonal of sqrt(D), stored for efficiency. */
-    private RealMatrix diagD;
-    /** Covariance matrix. */
-    private RealMatrix C;
-    /** Diagonal of C, used for diagonalOnly. */
-    private RealMatrix diagC;
-    /** Number of iterations already performed. */
+    // Number of iterations done so far.
     private int iterations;
 
+    // Varying auto-inferred parameters.
+    private double sigma;
+    private double normps;
+
+    // Vectors and matrices.
+    private RealMatrix xmean;
+    private RealMatrix pc;
+    private RealMatrix ps;
+    private RealMatrix B;
+    private RealMatrix D;
+    private RealMatrix BD;
+    private RealMatrix diagD;
+    private RealMatrix C;
+    private RealMatrix diagC;
+
     /** History queue of best values. */
-    private double[] fitnessHistory;
+    private final double[] fitnessHistory;
 
     /** Random generator. */
     private final RandomGenerator random;
 
-    /**
-     * @param maxIterations Maximal number of iterations.
-     * @param isActiveCMA Chooses the covariance matrix update method.
-     * @param nDiagonalOnlyIterations Number of initial iterations, where the covariance matrix remains diagonal.
-     * @param nResamplingUntilFeasible Determines how often new random objective variables are generated in case they are out of bounds.
-     * @param random Random generator.
-     *
-     * @since 3.1
-     */
     public CMAESDistributionOptimizer(int maxIterations,
                                       boolean isActiveCMA,
                                       int nDiagonalOnlyIterations,
@@ -133,23 +88,66 @@ public class CMAESDistributionOptimizer {
         this.dimension = dimension;
         this.populationSize = populationSize;
         this.function = function;
+
+        this.sigma = 1;
+
+        // initialize termination criteria
+        this.stopTolUpX = 1e3;
+        this.stopTolX = 1e-11;
+        this.stopTolFun = 1e-12;
+        this.stopTolHistFun = 1e-13;
+
+        // initialize selection strategy parameters
+        this.mu = populationSize / 2;
+        RealMatrix rawWeights = log(sequence(1, mu, 1)).scalarMultiply(-1).scalarAdd(FastMath.log(mu + 0.5));
+        double sumW = 0;
+        double sumWQ = 0;
+        for (int i = 0; i < mu; i++) {
+            double w = rawWeights.getEntry(i, 0);
+            sumW += w;
+            sumWQ += w * w;
+        }
+        this.weights = rawWeights.scalarMultiply(1 / sumW);
+        this.mueff = sumW * sumW / sumWQ;
+
+        // initialize parameters and constants
+        this.cc = (4 + mueff / dimension) / (dimension + 4 + 2 * mueff / dimension);
+        this.cs = (mueff + 2) / (dimension + mueff + 3);
+        this.damps = (1 + 2 * FastMath.max(0, FastMath.sqrt((mueff - 1) / (dimension + 1)) - 1)) *
+                FastMath.max(0.3, 1 - dimension / (1e-6 + maxIterations)) + cs;
+        this.ccov1 = 2 / ((dimension + 1.3) * (dimension + 1.3) + mueff);
+        this.ccovmu = FastMath.min(1 - ccov1, 2 * (mueff - 2 + 1 / mueff) / ((dimension + 2) * (dimension + 2) + mueff));
+        this.ccov1Sep = FastMath.min(1, ccov1 * (dimension + 1.5) / 3);
+        this.ccovmuSep = FastMath.min(1 - ccov1, ccovmu * (dimension + 1.5) / 3);
+        this.chiN = FastMath.sqrt(dimension) * (1 - 1 / (4.0 * dimension) + 1 / (21.0 * dimension * dimension));
+
+        // initialize matrices and vectors that change
+        diagD = ones(dimension, 1).scalarMultiply(1 / sigma);
+        diagC = square(diagD);
+        pc = zeros(dimension, 1);
+        ps = zeros(dimension, 1);
+        normps = ps.getFrobeniusNorm();
+        B = eye(dimension, dimension);
+        D = ones(dimension, 1);
+        BD = times(B, repmat(diagD.transpose(), dimension, 1));
+        C = B.multiply(diag(square(D)).multiply(B.transpose()));
+
+        int historySize = 10 + (int) (3 * 10 * dimension / (double) populationSize);
+        this.fitnessHistory = new double[historySize];
+        for (int i = 0; i < historySize; i++) {
+            this.fitnessHistory[i] = Double.MAX_VALUE;
+        }
     }
 
     public PointValuePair optimize() {
         // -------------------- Initialization --------------------------------
-        final double[] guess = new double[dimension];
-        double guessSum = 0;
-        for (int i = 0; i < dimension; ++i) {
-            guess[i] = random.nextDouble();
-            guessSum += guess[i];
-        }
-        for (int i = 0; i < dimension; ++i) {
-            guess[i] /= guessSum;
-        }
-        initializeCMA(guess);
+        initializeCMA();
+
         iterations = 0;
+        double[] guess = generateNormalizedRandomVector();
         double[] fixedGuess = repair(guess);
         double bestValue = function.apply(new double[][] {fixedGuess})[0] + penalty(guess, fixedGuess);
+        xmean = MatrixUtils.createColumnRealMatrix(guess);
         push(fitnessHistory, bestValue);
         PointValuePair optimum = new PointValuePair(guess, bestValue);
 
@@ -168,7 +166,7 @@ public class CMAESDistributionOptimizer {
             for (int k = 0; k < populationSize; k++) {
                 RealMatrix arxk = null;
                 for (int i = 0; i <= nResamplingUntilFeasible; i++) {
-                    if (nDiagonalOnlyIterations <= 0) {
+                    if (nDiagonalOnlyIterations <= iterations) {
                         arxk = xmean.add(BD.multiply(arz.getColumnMatrix(k))
                                 .scalarMultiply(sigma)); // m + sig * Normal(0,C)
                     } else {
@@ -202,7 +200,7 @@ public class CMAESDistributionOptimizer {
             final RealMatrix bestArz = selectColumns(arz, MathArrays.copyOf(arindex, mu));
             final RealMatrix zmean = bestArz.multiply(weights);
             final boolean hsig = updateEvolutionPaths(zmean, xold);
-            if (nDiagonalOnlyIterations <= 0) {
+            if (nDiagonalOnlyIterations <= iterations) {
                 updateCovariance(hsig, bestArx, arz, arindex, xold);
             } else {
                 updateCovarianceDiagonalOnly(hsig, bestArz);
@@ -260,66 +258,21 @@ public class CMAESDistributionOptimizer {
         return optimum;
     }
 
-    /**
-     * Initialization of the dynamic search parameters
-     *
-     * @param guess Initial guess for the arguments of the fitness function.
-     */
-    private void initializeCMA(double[] guess) {
-        sigma = 1;
-
-        // initialize termination criteria
-        stopTolUpX = 1e3;
-        stopTolX = 1e-11;
-        stopTolFun = 1e-12;
-        stopTolHistFun = 1e-13;
-
-        // initialize selection strategy parameters
-        mu = populationSize / 2; // number of parents/points for recombination
-        weights = log(sequence(1, mu, 1)).scalarMultiply(-1).scalarAdd(FastMath.log(mu + 0.5));
-        double sumw = 0;
-        double sumwq = 0;
-        for (int i = 0; i < mu; i++) {
-            double w = weights.getEntry(i, 0);
-            sumw += w;
-            sumwq += w * w;
-        }
-        weights = weights.scalarMultiply(1 / sumw);
-        mueff = sumw * sumw / sumwq; // variance-effectiveness of sum w_i x_i
-
-        // initialize dynamic strategy parameters and constants
-        cc = (4 + mueff / dimension) /
-                (dimension + 4 + 2 * mueff / dimension);
-        cs = (mueff + 2) / (dimension + mueff + 3.);
-        damps = (1 + 2 * FastMath.max(0, FastMath.sqrt((mueff - 1) /
-                (dimension + 1)) - 1)) *
-                FastMath.max(0.3,
-                        1 - dimension / (1e-6 + maxIterations)) + cs; // minor increment
-        ccov1 = 2 / ((dimension + 1.3) * (dimension + 1.3) + mueff);
-        ccovmu = FastMath.min(1 - ccov1, 2 * (mueff - 2 + 1 / mueff) /
-                ((dimension + 2) * (dimension + 2) + mueff));
-        ccov1Sep = FastMath.min(1, ccov1 * (dimension + 1.5) / 3);
-        ccovmuSep = FastMath.min(1 - ccov1, ccovmu * (dimension + 1.5) / 3);
-        chiN = FastMath.sqrt(dimension) *
-                (1 - 1 / ((double) 4 * dimension) + 1 / ((double) 21 * dimension * dimension));
+    private void initializeCMA() {
         // intialize CMA internal values - updated each generation
-        xmean = MatrixUtils.createColumnRealMatrix(guess); // objective variables
-        diagD = ones(guess.length, 1).scalarMultiply(1 / sigma);
-        diagC = square(diagD);
-        pc = zeros(dimension, 1); // evolution paths for C and sigma
-        ps = zeros(dimension, 1); // B defines the coordinate system
-        normps = ps.getFrobeniusNorm();
+    }
 
-        B = eye(dimension, dimension);
-        D = ones(dimension, 1); // diagonal D defines the scaling
-        BD = times(B, repmat(diagD.transpose(), dimension, 1));
-        C = B.multiply(diag(square(D)).multiply(B.transpose())); // covariance
-
-        int historySize = 10 + (int) (3 * 10 * dimension / (double) populationSize);
-        fitnessHistory = new double[historySize]; // history of fitness values
-        for (int i = 0; i < historySize; i++) {
-            fitnessHistory[i] = Double.MAX_VALUE;
+    private double[] generateNormalizedRandomVector() {
+        final double[] guess = new double[dimension];
+        double guessSum = 0;
+        for (int i = 0; i < dimension; ++i) {
+            guess[i] = random.nextDouble();
+            guessSum += guess[i];
         }
+        for (int i = 0; i < dimension; ++i) {
+            guess[i] /= guessSum;
+        }
+        return guess;
     }
 
     /**
@@ -362,10 +315,8 @@ public class CMAESDistributionOptimizer {
                 .add((times(diagC, square(bestArz).multiply(weights))) // plus rank mu update
                         .scalarMultiply(ccovmuSep));
         diagD = sqrt(diagC); // replaces eig(C)
-        if (nDiagonalOnlyIterations > 1 &&
-                iterations > nDiagonalOnlyIterations) {
+        if (iterations > nDiagonalOnlyIterations) {
             // full covariance matrix from now on
-            nDiagonalOnlyIterations = 0;
             B = eye(dimension, dimension);
             BD = diag(diagD);
             C = diag(diagC);
