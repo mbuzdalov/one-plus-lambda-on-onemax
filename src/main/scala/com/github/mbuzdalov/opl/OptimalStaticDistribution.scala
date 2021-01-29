@@ -8,8 +8,8 @@ import scala.annotation.tailrec
 import scala.util.Using
 
 import org.apache.commons.math3.analysis.MultivariateFunction
-import org.apache.commons.math3.optim.nonlinear.scalar.{GoalType, ObjectiveFunction}
-import org.apache.commons.math3.optim.{InitialGuess, MaxEval, SimpleBounds}
+import org.apache.commons.math3.optim.nonlinear.scalar.ObjectiveFunction
+import org.apache.commons.math3.optim.{InitialGuess, SimpleBounds}
 import org.apache.commons.math3.random.{MersenneTwister, RandomGenerator}
 
 import com.github.mbuzdalov.opl.computation.{BareComputationListener, OptimalRunningTime}
@@ -126,9 +126,8 @@ object OptimalStaticDistribution {
     val optimizer = new CMAESOptimizer(100 * n * n, 0, true, 10,
       10, rng)
     val result = optimizer.optimize(new ObjectiveFunction(objectiveFunction), new InitialGuess(initialGuess),
-      GoalType.MINIMIZE, new CMAESOptimizer.PopulationSize(10),
-      new CMAESOptimizer.Sigma(Array.fill(n)(1)), new SimpleBounds(Array.fill(n)(0), Array.fill(n)(1)),
-      new MaxEval(100 * n * n))
+      new CMAESOptimizer.PopulationSize(10), new CMAESOptimizer.Sigma(Array.fill(n)(1)),
+      new SimpleBounds(Array.fill(n)(0), Array.fill(n)(1)))
 
     val finalDistribution = result.getPoint
     normalize(finalDistribution)

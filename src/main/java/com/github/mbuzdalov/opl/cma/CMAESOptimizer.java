@@ -8,8 +8,10 @@ import org.apache.commons.math3.linear.Array2DRowRealMatrix;
 import org.apache.commons.math3.linear.EigenDecomposition;
 import org.apache.commons.math3.linear.MatrixUtils;
 import org.apache.commons.math3.linear.RealMatrix;
-import org.apache.commons.math3.optim.*;
-import org.apache.commons.math3.optim.nonlinear.scalar.GoalType;
+import org.apache.commons.math3.optim.InitialGuess;
+import org.apache.commons.math3.optim.OptimizationData;
+import org.apache.commons.math3.optim.PointValuePair;
+import org.apache.commons.math3.optim.SimpleBounds;
 import org.apache.commons.math3.optim.nonlinear.scalar.ObjectiveFunction;
 import org.apache.commons.math3.random.RandomGenerator;
 import org.apache.commons.math3.util.FastMath;
@@ -81,15 +83,6 @@ public class CMAESOptimizer {
 
     // fields from MultivariateOptimizer
     private MultivariateFunction function;
-    /** Type of optimization. */
-    private GoalType goal;
-
-    /**
-     * @return the optimization type.
-     */
-    public GoalType getGoalType() {
-        return goal;
-    }
 
     /**
      * Computes the objective function value.
@@ -143,7 +136,7 @@ public class CMAESOptimizer {
      */
     private int diagonalOnly;
     /** Number of objective variables/problem dimension */
-    private boolean isMinimize = true;
+    private final boolean isMinimize = true;
 
     // termination criteria
     /** Maximal number of iterations allowed. */
@@ -323,7 +316,6 @@ public class CMAESOptimizer {
 
     protected PointValuePair doOptimize() {
         // -------------------- Initialization --------------------------------
-        isMinimize = getGoalType().equals(GoalType.MINIMIZE);
         final FitnessFunction fitfun = new FitnessFunction();
         final double[] guess = getStartPoint();
         // number of objective variables/problem dimension
@@ -466,10 +458,6 @@ public class CMAESOptimizer {
                 final SimpleBounds bounds = (SimpleBounds) data;
                 lowerBound = bounds.getLower();
                 upperBound = bounds.getUpper();
-                continue;
-            }
-            if (data instanceof GoalType) {
-                goal = (GoalType) data;
                 continue;
             }
             if (data instanceof ObjectiveFunction) {
