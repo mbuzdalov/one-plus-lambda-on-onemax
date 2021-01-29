@@ -11,13 +11,12 @@ import org.apache.commons.math3.linear.RealMatrix;
 import org.apache.commons.math3.optim.InitialGuess;
 import org.apache.commons.math3.optim.OptimizationData;
 import org.apache.commons.math3.optim.PointValuePair;
-import org.apache.commons.math3.optim.SimpleBounds;
 import org.apache.commons.math3.optim.nonlinear.scalar.ObjectiveFunction;
 import org.apache.commons.math3.random.RandomGenerator;
 import org.apache.commons.math3.util.FastMath;
 import org.apache.commons.math3.util.MathArrays;
 
-public class CMAESOptimizer {
+public class CMAESDistributionOptimizer {
     // from BaseOptimizer
     public PointValuePair optimize(OptimizationData... optData) {
         parseOptimizationData(optData);
@@ -26,8 +25,6 @@ public class CMAESOptimizer {
 
     // fields from BaseMultivariateOptimizer
     private double[] start;
-    private double[] lowerBound;
-    private double[] upperBound;
 
     // fields from MultivariateOptimizer
     private MultivariateFunction function;
@@ -48,12 +45,10 @@ public class CMAESOptimizer {
      * not feasible / beyond the defined limits, default is 0.
      */
     private final int nResamplingUntilFeasble;
-    /**
-     * @see CMAESOptimizer.Sigma
-     */
-    private double[] inputSigma;
+
     /** Number of objective variables/problem dimension */
     private int dimension;
+
     /**
      * Defines the number of initial iterations, where the covariance matrix
      * remains diagonal and the algorithm has internally linear time complexity.
@@ -143,57 +138,18 @@ public class CMAESOptimizer {
      *
      * @since 3.1
      */
-    public CMAESOptimizer(int maxIterations,
-                          boolean isActiveCMA,
-                          int nDiagonalOnlyIterations,
-                          int nResamplingUntilFeasible,
-                          RandomGenerator random,
-                          int populationSize) {
+    public CMAESDistributionOptimizer(int maxIterations,
+                                      boolean isActiveCMA,
+                                      int nDiagonalOnlyIterations,
+                                      int nResamplingUntilFeasible,
+                                      RandomGenerator random,
+                                      int populationSize) {
         this.maxIterations = maxIterations;
         this.isActiveCMA = isActiveCMA;
         this.nDiagonalOnlyIterations = nDiagonalOnlyIterations;
         this.nResamplingUntilFeasble = nResamplingUntilFeasible;
         this.random = random;
         this.populationSize = populationSize;
-    }
-
-    /**
-     * Input sigma values.
-     * They define the initial coordinate-wise standard deviations for
-     * sampling new search points around the initial guess.
-     * It is suggested to set them to the estimated distance from the
-     * initial to the desired optimum.
-     * Small values induce the search to be more local (and very small
-     * values are more likely to find a local optimum close to the initial
-     * guess).
-     * Too small values might however lead to early termination.
-     */
-    public static class Sigma implements OptimizationData {
-        /** Sigma values. */
-        private final double[] sigma;
-
-        /**
-         * @param s Sigma values.
-         * @throws NotPositiveException if any of the array entries is smaller
-         * than zero.
-         */
-        public Sigma(double[] s)
-                throws NotPositiveException {
-            for (double v : s) {
-                if (v < 0) {
-                    throw new NotPositiveException(v);
-                }
-            }
-
-            sigma = s.clone();
-        }
-
-        /**
-         * @return the sigma values.
-         */
-        public double[] getSigma() {
-            return sigma.clone();
-        }
     }
 
     protected PointValuePair doOptimize() {
@@ -326,18 +282,8 @@ public class CMAESOptimizer {
                 start = ((InitialGuess) data).getInitialGuess();
                 continue;
             }
-            if (data instanceof SimpleBounds) {
-                final SimpleBounds bounds = (SimpleBounds) data;
-                lowerBound = bounds.getLower();
-                upperBound = bounds.getUpper();
-                continue;
-            }
             if (data instanceof ObjectiveFunction) {
                 function = ((ObjectiveFunction) data).getObjectiveFunction();
-                continue;
-            }
-            if (data instanceof Sigma) {
-                inputSigma = ((Sigma) data).getSigma();
                 continue;
             }
         }
@@ -347,28 +293,14 @@ public class CMAESOptimizer {
 
     private void checkParameters() {
         final int dim = start.length;
-        if (lowerBound.length != dim) {
-            throw new DimensionMismatchException(lowerBound.length, dim);
-        }
-        for (int i = 0; i < dim; i++) {
-            if (start[i] < lowerBound[i]) {
-                throw new NumberIsTooSmallException(start[i], lowerBound[i], true);
+        for (double v : start) {
+            if (v < 0) {
+                throw new NumberIsTooSmallException(v, 0, true);
             }
         }
-        if (upperBound.length != dim) {
-            throw new DimensionMismatchException(upperBound.length, dim);
-        }
-        for (int i = 0; i < dim; i++) {
-            if (start[i] > upperBound[i]) {
-                throw new NumberIsTooLargeException(start[i], upperBound[i], true);
-            }
-        }
-        if (inputSigma.length != dim) {
-            throw new DimensionMismatchException(inputSigma.length, start.length);
-        }
-        for (int i = 0; i < dim; i++) {
-            if (inputSigma[i] > upperBound[i] - lowerBound[i]) {
-                throw new OutOfRangeException(inputSigma[i], 0, upperBound[i] - lowerBound[i]);
+        for (double v : start) {
+            if (v > 1) {
+                throw new NumberIsTooLargeException(v, 1, true);
             }
         }
     }
@@ -382,17 +314,11 @@ public class CMAESOptimizer {
         if (populationSize <= 0) {
             throw new NotStrictlyPositiveException(populationSize);
         }
-        // initialize sigma
-        final double[][] sigmaArray = new double[guess.length][1];
-        for (int i = 0; i < guess.length; i++) {
-            sigmaArray[i][0] = inputSigma[i];
-        }
-        final RealMatrix insigma = new Array2DRowRealMatrix(sigmaArray, false);
-        sigma = max(insigma); // overall standard deviation
+        sigma = 1;
 
         // initialize termination criteria
-        stopTolUpX = 1e3 * max(insigma);
-        stopTolX = 1e-11 * max(insigma);
+        stopTolUpX = 1e3;
+        stopTolX = 1e-11;
         stopTolFun = 1e-12;
         stopTolHistFun = 1e-13;
 
@@ -426,7 +352,7 @@ public class CMAESOptimizer {
                 (1 - 1 / ((double) 4 * dimension) + 1 / ((double) 21 * dimension * dimension));
         // intialize CMA internal values - updated each generation
         xmean = MatrixUtils.createColumnRealMatrix(guess); // objective variables
-        diagD = insigma.scalarMultiply(1 / sigma);
+        diagD = ones(guess.length, 1).scalarMultiply(1 / sigma);
         diagC = square(diagD);
         pc = zeros(dimension, 1); // evolution paths for C and sigma
         ps = zeros(dimension, 1); // B defines the coordinate system
@@ -758,14 +684,8 @@ public class CMAESOptimizer {
          * @return {@code true} if in bounds.
          */
         public boolean isFeasible(final double[] x) {
-            final double[] lB = lowerBound;
-            final double[] uB = upperBound;
-
-            for (int i = 0; i < x.length; i++) {
-                if (x[i] < lB[i]) {
-                    return false;
-                }
-                if (x[i] > uB[i]) {
+            for (double v : x) {
+                if (v < 0 || v > 1) {
                     return false;
                 }
             }
@@ -779,9 +699,11 @@ public class CMAESOptimizer {
         private double[] repair(final double[] x) {
             final double[] repaired = new double[x.length];
             for (int i = 0; i < x.length; i++) {
-                if (x[i] < lowerBound[i]) {
-                    repaired[i] = lowerBound[i];
-                } else repaired[i] = Math.min(x[i], upperBound[i]);
+                if (x[i] < 0) {
+                    repaired[i] = 0;
+                } else {
+                    repaired[i] = Math.min(x[i], 1);
+                }
             }
             return repaired;
         }

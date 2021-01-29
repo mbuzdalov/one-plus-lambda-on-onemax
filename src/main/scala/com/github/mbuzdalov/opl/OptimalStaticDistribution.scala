@@ -1,20 +1,18 @@
 package com.github.mbuzdalov.opl
 
+import com.github.mbuzdalov.opl.cma.CMAESDistributionOptimizer
+
 import java.io.PrintWriter
 import java.util.concurrent.locks.ReentrantLock
 import java.util.concurrent.{Callable, ConcurrentLinkedDeque, CountDownLatch, Executors}
-
 import scala.annotation.tailrec
 import scala.util.Using
-
 import org.apache.commons.math3.analysis.MultivariateFunction
 import org.apache.commons.math3.optim.nonlinear.scalar.ObjectiveFunction
 import org.apache.commons.math3.optim.{InitialGuess, SimpleBounds}
 import org.apache.commons.math3.random.{MersenneTwister, RandomGenerator}
-
 import com.github.mbuzdalov.opl.computation.{BareComputationListener, OptimalRunningTime}
 import com.github.mbuzdalov.opl.distribution.ParameterizedDistribution
-import com.github.mbuzdalov.opl.cma.CMAESOptimizer
 
 
 object OptimalStaticDistribution {
@@ -123,10 +121,8 @@ object OptimalStaticDistribution {
     val initialGuess = Array.fill(n)(rng.nextDouble())
     normalize(initialGuess)
 
-    val optimizer = new CMAESOptimizer(100 * n * n, true, 10, 10, rng, 10)
-    val result = optimizer.optimize(new ObjectiveFunction(objectiveFunction), new InitialGuess(initialGuess),
-      new CMAESOptimizer.Sigma(Array.fill(n)(1)),
-      new SimpleBounds(Array.fill(n)(0), Array.fill(n)(1)))
+    val optimizer = new CMAESDistributionOptimizer(100 * n * n, true, 10, 10, rng, 10)
+    val result = optimizer.optimize(new ObjectiveFunction(objectiveFunction), new InitialGuess(initialGuess))
 
     val finalDistribution = result.getPoint
     normalize(finalDistribution)
