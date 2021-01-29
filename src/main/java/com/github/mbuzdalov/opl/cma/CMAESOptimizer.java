@@ -26,26 +26,8 @@ public class CMAESOptimizer {
 
     // fields from BaseMultivariateOptimizer
     private double[] start;
-    /** Lower bounds. */
     private double[] lowerBound;
-    /** Upper bounds. */
     private double[] upperBound;
-
-    public double[] getStartPoint() {
-        return start == null ? null : start.clone();
-    }
-    /**
-     * @return the lower bounds, or {@code null} if not set.
-     */
-    public double[] getLowerBound() {
-        return lowerBound == null ? null : lowerBound.clone();
-    }
-    /**
-     * @return the upper bounds, or {@code null} if not set.
-     */
-    public double[] getUpperBound() {
-        return upperBound == null ? null : upperBound.clone();
-    }
 
     /**
      * Check parameters consistency.
@@ -83,20 +65,6 @@ public class CMAESOptimizer {
 
     // fields from MultivariateOptimizer
     private MultivariateFunction function;
-
-    /**
-     * Computes the objective function value.
-     * This method <em>must</em> be called by subclasses to enforce the
-     * evaluation counter limit.
-     *
-     * @param params Point at which the objective function must be evaluated.
-     * @return the objective function value at the specified point.
-     * @throws TooManyEvaluationsException if the maximal number of
-     * evaluations is exceeded.
-     */
-    public double computeObjectiveValue(double[] params) {
-        return function.value(params);
-    }
 
     // global search parameters
     /**
@@ -255,9 +223,9 @@ public class CMAESOptimizer {
          */
         public Sigma(double[] s)
                 throws NotPositiveException {
-            for (int i = 0; i < s.length; i++) {
-                if (s[i] < 0) {
-                    throw new NotPositiveException(s[i]);
+            for (double v : s) {
+                if (v < 0) {
+                    throw new NotPositiveException(v);
                 }
             }
 
@@ -309,7 +277,7 @@ public class CMAESOptimizer {
     protected PointValuePair doOptimize() {
         // -------------------- Initialization --------------------------------
         final FitnessFunction fitfun = new FitnessFunction();
-        final double[] guess = getStartPoint();
+        final double[] guess = start;
         // number of objective variables/problem dimension
         dimension = guess.length;
         initializeCMA(guess);
@@ -317,7 +285,7 @@ public class CMAESOptimizer {
         ValuePenaltyPair valuePenalty = fitfun.value(guess);
         double bestValue = valuePenalty.value+valuePenalty.penalty;
         push(fitnessHistory, bestValue);
-        PointValuePair optimum = new PointValuePair(getStartPoint(), bestValue);
+        PointValuePair optimum = new PointValuePair(start, bestValue);
 
         // -------------------- Generation Loop --------------------------------
 
@@ -465,9 +433,9 @@ public class CMAESOptimizer {
      * Checks dimensions and values of boundaries and inputSigma if defined.
      */
     private void checkParameters() {
-        final double[] init = getStartPoint();
-        final double[] lB = getLowerBound();
-        final double[] uB = getUpperBound();
+        final double[] init = start;
+        final double[] lB = lowerBound;
+        final double[] uB = upperBound;
 
         if (inputSigma != null) {
             if (inputSigma.length != init.length) {
@@ -853,10 +821,10 @@ public class CMAESOptimizer {
             double penalty=0.0;
             if (isRepairMode) {
                 double[] repaired = repair(point);
-                value = CMAESOptimizer.this.computeObjectiveValue(repaired);
+                value = function.value(repaired);
                 penalty =  penalty(point, repaired);
             } else {
-                value = CMAESOptimizer.this.computeObjectiveValue(point);
+                value = function.value(point);
             }
             return new ValuePenaltyPair(value,penalty);
         }
@@ -866,8 +834,8 @@ public class CMAESOptimizer {
          * @return {@code true} if in bounds.
          */
         public boolean isFeasible(final double[] x) {
-            final double[] lB = CMAESOptimizer.this.getLowerBound();
-            final double[] uB = CMAESOptimizer.this.getUpperBound();
+            final double[] lB = lowerBound;
+            final double[] uB = upperBound;
 
             for (int i = 0; i < x.length; i++) {
                 if (x[i] < lB[i]) {
@@ -885,8 +853,8 @@ public class CMAESOptimizer {
          * @return the repaired (i.e. all in bounds) objective variables.
          */
         private double[] repair(final double[] x) {
-            final double[] lB = CMAESOptimizer.this.getLowerBound();
-            final double[] uB = CMAESOptimizer.this.getUpperBound();
+            final double[] lB = lowerBound;
+            final double[] uB = upperBound;
 
             final double[] repaired = new double[x.length];
             for (int i = 0; i < x.length; i++) {
