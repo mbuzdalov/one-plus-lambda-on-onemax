@@ -139,8 +139,6 @@ public class CMAESOptimizer {
     // termination criteria
     /** Maximal number of iterations allowed. */
     private final int maxIterations;
-    /** Limit for fitness value. */
-    private final double stopFitness;
     /** Stop if x-changes larger stopTolUpX. */
     private double stopTolUpX;
     /** Stop if x-change smaller stopTolX. */
@@ -214,8 +212,6 @@ public class CMAESOptimizer {
 
     /**
      * @param maxIterations Maximal number of iterations.
-     * @param stopFitness Whether to stop if objective function value is smaller than
-     * {@code stopFitness}.
      * @param isActiveCMA Chooses the covariance matrix update method.
      * @param diagonalOnly Number of initial iterations, where the covariance matrix
      * remains diagonal.
@@ -226,13 +222,11 @@ public class CMAESOptimizer {
      * @since 3.1
      */
     public CMAESOptimizer(int maxIterations,
-                          double stopFitness,
                           boolean isActiveCMA,
                           int diagonalOnly,
                           int checkFeasableCount,
                           RandomGenerator random) {
         this.maxIterations = maxIterations;
-        this.stopFitness = stopFitness;
         this.isActiveCMA = isActiveCMA;
         this.diagonalOnly = diagonalOnly;
         this.checkFeasableCount = checkFeasableCount;
@@ -389,10 +383,6 @@ public class CMAESOptimizer {
                 optimum = new PointValuePair(fitfun.repair(bestArx.getColumn(0)), bestFitness);
             }
             // handle termination criteria
-            // Break, if fitness is good enough
-            if (stopFitness != 0 && bestFitness < stopFitness) {
-                break generationLoop;
-            }
             final double[] sqrtDiagC = sqrt(diagC).getColumn(0);
             final double[] pcCol = pc.getColumn(0);
             for (int i = 0; i < dimension; i++) {
