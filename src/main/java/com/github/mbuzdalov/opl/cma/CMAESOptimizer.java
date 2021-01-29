@@ -135,8 +135,6 @@ public class CMAESOptimizer {
      * @see <a href="http://hal.archives-ouvertes.fr/inria-00287367/en">A Simple Modification in CMA-ES</a>
      */
     private int diagonalOnly;
-    /** Number of objective variables/problem dimension */
-    private final boolean isMinimize = true;
 
     // termination criteria
     /** Maximal number of iterations allowed. */
@@ -325,10 +323,7 @@ public class CMAESOptimizer {
         ValuePenaltyPair valuePenalty = fitfun.value(guess);
         double bestValue = valuePenalty.value+valuePenalty.penalty;
         push(fitnessHistory, bestValue);
-        PointValuePair optimum
-                = new PointValuePair(getStartPoint(),
-                isMinimize ? bestValue : -bestValue);
-        PointValuePair lastResult = null;
+        PointValuePair optimum = new PointValuePair(getStartPoint(), bestValue);
 
         // -------------------- Generation Loop --------------------------------
 
@@ -391,13 +386,11 @@ public class CMAESOptimizer {
             final double worstFitness = fitness[arindex[arindex.length - 1]];
             if (bestValue > bestFitness) {
                 bestValue = bestFitness;
-                lastResult = optimum;
-                optimum = new PointValuePair(fitfun.repair(bestArx.getColumn(0)),
-                        isMinimize ? bestFitness : -bestFitness);
+                optimum = new PointValuePair(fitfun.repair(bestArx.getColumn(0)), bestFitness);
             }
             // handle termination criteria
             // Break, if fitness is good enough
-            if (stopFitness != 0 && bestFitness < (isMinimize ? stopFitness : -stopFitness)) {
+            if (stopFitness != 0 && bestFitness < stopFitness) {
                 break generationLoop;
             }
             final double[] sqrtDiagC = sqrt(diagC).getColumn(0);
@@ -875,8 +868,6 @@ public class CMAESOptimizer {
             } else {
                 value = CMAESOptimizer.this.computeObjectiveValue(point);
             }
-            value = isMinimize ? value : -value;
-            penalty = isMinimize ? penalty : -penalty;
             return new ValuePenaltyPair(value,penalty);
         }
 
@@ -931,7 +922,7 @@ public class CMAESOptimizer {
                 double diff = FastMath.abs(x[i] - repaired[i]);
                 penalty += diff;
             }
-            return isMinimize ? penalty : -penalty;
+            return penalty;
         }
     }
 
