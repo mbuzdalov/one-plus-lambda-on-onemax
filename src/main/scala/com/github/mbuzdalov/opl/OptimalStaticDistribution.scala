@@ -1,15 +1,16 @@
 package com.github.mbuzdalov.opl
 
-import com.github.mbuzdalov.opl.cma.CMAESDistributionOptimizer
-
 import java.io.PrintWriter
 import java.util.concurrent.locks.ReentrantLock
 import java.util.concurrent.{Callable, ConcurrentLinkedDeque, CountDownLatch, Executors}
+
 import scala.annotation.tailrec
 import scala.util.Using
+
 import org.apache.commons.math3.analysis.MultivariateFunction
-import org.apache.commons.math3.optim.nonlinear.scalar.ObjectiveFunction
 import org.apache.commons.math3.random.{MersenneTwister, RandomGenerator}
+
+import com.github.mbuzdalov.opl.cma.CMAESDistributionOptimizer
 import com.github.mbuzdalov.opl.computation.{BareComputationListener, OptimalRunningTime}
 import com.github.mbuzdalov.opl.distribution.ParameterizedDistribution
 
@@ -118,8 +119,8 @@ object OptimalStaticDistribution {
   def findOptimalDistribution(n: Int, lambda: Int, rng: RandomGenerator): RunResult = {
     val objectiveFunction = new FitnessFunction(lambda)
 
-    val optimizer = new CMAESDistributionOptimizer(100 * n * n, true, 10, 10, rng, n, 10)
-    val result = optimizer.optimize(new ObjectiveFunction(objectiveFunction))
+    val optimizer = new CMAESDistributionOptimizer(100 * n * n, true, 10, 10, rng, n, 10, objectiveFunction)
+    val result = optimizer.optimize()
 
     val finalDistribution = result.getPoint
     normalize(finalDistribution)

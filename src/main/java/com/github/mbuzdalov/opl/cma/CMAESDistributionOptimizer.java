@@ -3,31 +3,21 @@ package com.github.mbuzdalov.opl.cma;
 import java.util.Arrays;
 
 import org.apache.commons.math3.analysis.MultivariateFunction;
-import org.apache.commons.math3.exception.*;
+import org.apache.commons.math3.exception.NotStrictlyPositiveException;
+import org.apache.commons.math3.exception.TooManyEvaluationsException;
 import org.apache.commons.math3.linear.Array2DRowRealMatrix;
 import org.apache.commons.math3.linear.EigenDecomposition;
 import org.apache.commons.math3.linear.MatrixUtils;
 import org.apache.commons.math3.linear.RealMatrix;
-import org.apache.commons.math3.optim.InitialGuess;
-import org.apache.commons.math3.optim.OptimizationData;
 import org.apache.commons.math3.optim.PointValuePair;
-import org.apache.commons.math3.optim.nonlinear.scalar.ObjectiveFunction;
 import org.apache.commons.math3.random.RandomGenerator;
 import org.apache.commons.math3.util.FastMath;
 import org.apache.commons.math3.util.MathArrays;
 
 public class CMAESDistributionOptimizer {
-    // from BaseOptimizer
-    public PointValuePair optimize(OptimizationData... optData) {
-        parseOptimizationData(optData);
-        return doOptimize();
-    }
-
-    // fields from MultivariateOptimizer
-    private MultivariateFunction function;
-
-    // global search parameters
     private final int populationSize;
+    private final int dimension;
+    private final MultivariateFunction function;
 
     /**
      * Covariance update mechanism, default is active CMA. isActiveCMA = true
@@ -41,19 +31,8 @@ public class CMAESDistributionOptimizer {
      * Determines how often a new random offspring is generated in case it is
      * not feasible / beyond the defined limits, default is 0.
      */
-    private final int nResamplingUntilFeasble;
+    private final int nResamplingUntilFeasible;
 
-    /** Number of objective variables/problem dimension */
-    private final int dimension;
-
-    /**
-     * Defines the number of initial iterations, where the covariance matrix
-     * remains diagonal and the algorithm has internally linear time complexity.
-     * diagonalOnly = 1 means keeping the covariance matrix always diagonal and
-     * this setting also exhibits linear space complexity. This can be
-     * particularly useful for dimension > 100.
-     * @see <a href="http://hal.archives-ouvertes.fr/inria-00287367/en">A Simple Modification in CMA-ES</a>
-     */
     private int nDiagonalOnlyIterations;
 
     // termination criteria
@@ -141,17 +120,19 @@ public class CMAESDistributionOptimizer {
                                       int nResamplingUntilFeasible,
                                       RandomGenerator random,
                                       int dimension,
-                                      int populationSize) {
+                                      int populationSize,
+                                      MultivariateFunction function) {
         this.maxIterations = maxIterations;
         this.isActiveCMA = isActiveCMA;
         this.nDiagonalOnlyIterations = nDiagonalOnlyIterations;
-        this.nResamplingUntilFeasble = nResamplingUntilFeasible;
+        this.nResamplingUntilFeasible = nResamplingUntilFeasible;
         this.random = random;
         this.dimension = dimension;
         this.populationSize = populationSize;
+        this.function = function;
     }
 
-    protected PointValuePair doOptimize() {
+    public PointValuePair optimize() {
         // -------------------- Initialization --------------------------------
         final FitnessFunction fitfun = new FitnessFunction();
         final double[] guess = new double[dimension];
@@ -182,7 +163,7 @@ public class CMAESDistributionOptimizer {
             // generate random offspring
             for (int k = 0; k < populationSize; k++) {
                 RealMatrix arxk = null;
-                for (int i = 0; i <= nResamplingUntilFeasble; i++) {
+                for (int i = 0; i <= nResamplingUntilFeasible; i++) {
                     if (nDiagonalOnlyIterations <= 0) {
                         arxk = xmean.add(BD.multiply(arz.getColumnMatrix(k))
                                 .scalarMultiply(sigma)); // m + sig * Normal(0,C)
@@ -190,7 +171,7 @@ public class CMAESDistributionOptimizer {
                         arxk = xmean.add(times(diagD,arz.getColumnMatrix(k))
                                 .scalarMultiply(sigma));
                     }
-                    if (i >= nResamplingUntilFeasble || fitfun.isFeasible(arxk.getColumn(0))) {
+                    if (i >= nResamplingUntilFeasible || fitfun.isFeasible(arxk.getColumn(0))) {
                         break;
                     }
                     // regenerate random arguments for row
@@ -275,19 +256,6 @@ public class CMAESDistributionOptimizer {
             push(fitnessHistory,bestFitness);
         }
         return optimum;
-    }
-
-    protected void parseOptimizationData(OptimizationData... optData) {
-        // Allow base class to register its own data.
-
-        // The existing values (as set by the previous call) are reused if
-        // not provided in the argument list.
-        for (OptimizationData data : optData) {
-            if (data instanceof ObjectiveFunction) {
-                function = ((ObjectiveFunction) data).getObjectiveFunction();
-                continue;
-            }
-        }
     }
 
     /**
@@ -636,31 +604,13 @@ public class CMAESDistributionOptimizer {
      */
     private class FitnessFunction {
         /**
-         * Flag indicating whether the objective variables are forced into their
-         * bounds if defined
-         */
-        private final boolean isRepairMode;
-
-        /** Simple constructor.
-         */
-        FitnessFunction() {
-            isRepairMode = true;
-        }
-
-        /**
          * @param point Normalized objective variables.
          * @return the objective value + penalty for violated bounds.
          */
         public ValuePenaltyPair value(final double[] point) {
-            double value;
-            double penalty=0.0;
-            if (isRepairMode) {
-                double[] repaired = repair(point);
-                value = function.value(repaired);
-                penalty =  penalty(point, repaired);
-            } else {
-                value = function.value(point);
-            }
+            double[] repaired = repair(point);
+            double value = function.value(repaired);
+            double penalty =  penalty(point, repaired);
             return new ValuePenaltyPair(value,penalty);
         }
 
