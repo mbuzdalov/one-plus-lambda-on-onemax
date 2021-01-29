@@ -9,12 +9,13 @@ import scala.util.Using
 
 import org.apache.commons.math3.analysis.MultivariateFunction
 import org.apache.commons.math3.optim.nonlinear.scalar.{GoalType, ObjectiveFunction}
-import org.apache.commons.math3.optim.{ConvergenceChecker, InitialGuess, MaxEval, PointValuePair, SimpleBounds}
-import org.apache.commons.math3.optim.nonlinear.scalar.noderiv.CMAESOptimizer
+import org.apache.commons.math3.optim.{InitialGuess, MaxEval, SimpleBounds}
 import org.apache.commons.math3.random.{MersenneTwister, RandomGenerator}
 
 import com.github.mbuzdalov.opl.computation.{BareComputationListener, OptimalRunningTime}
 import com.github.mbuzdalov.opl.distribution.ParameterizedDistribution
+import com.github.mbuzdalov.opl.cma.CMAESOptimizer
+
 
 object OptimalStaticDistribution {
   private class LatchWrapper(val latch: CountDownLatch, var done: Boolean) {
@@ -106,10 +107,6 @@ object OptimalStaticDistribution {
     def sequence: IndexedSeq[(Int, Double)] = fitnessSequence.result()
   }
 
-  private object NeverConverged extends ConvergenceChecker[PointValuePair] {
-    override def converged(iteration: Int, previous: PointValuePair, current: PointValuePair): Boolean = false
-  }
-
   private def normalize(a: Array[Double]): Unit = {
     val sum = a.sum
     var i = a.length
@@ -127,7 +124,7 @@ object OptimalStaticDistribution {
     normalize(initialGuess)
 
     val optimizer = new CMAESOptimizer(100 * n * n, 0, true, 10,
-      10, rng, false, NeverConverged)
+      10, rng, false)
     val result = optimizer.optimize(new ObjectiveFunction(objectiveFunction), new InitialGuess(initialGuess),
       GoalType.MINIMIZE, new CMAESOptimizer.PopulationSize(10),
       new CMAESOptimizer.Sigma(Array.fill(n)(1)), new SimpleBounds(Array.fill(n)(0), Array.fill(n)(1)),
