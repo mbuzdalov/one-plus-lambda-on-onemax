@@ -9,7 +9,6 @@ import scala.annotation.tailrec
 import scala.util.Using
 import org.apache.commons.math3.analysis.MultivariateFunction
 import org.apache.commons.math3.optim.nonlinear.scalar.ObjectiveFunction
-import org.apache.commons.math3.optim.{InitialGuess, SimpleBounds}
 import org.apache.commons.math3.random.{MersenneTwister, RandomGenerator}
 import com.github.mbuzdalov.opl.computation.{BareComputationListener, OptimalRunningTime}
 import com.github.mbuzdalov.opl.distribution.ParameterizedDistribution
@@ -118,11 +117,9 @@ object OptimalStaticDistribution {
 
   def findOptimalDistribution(n: Int, lambda: Int, rng: RandomGenerator): RunResult = {
     val objectiveFunction = new FitnessFunction(lambda)
-    val initialGuess = Array.fill(n)(rng.nextDouble())
-    normalize(initialGuess)
 
-    val optimizer = new CMAESDistributionOptimizer(100 * n * n, true, 10, 10, rng, 10)
-    val result = optimizer.optimize(new ObjectiveFunction(objectiveFunction), new InitialGuess(initialGuess))
+    val optimizer = new CMAESDistributionOptimizer(100 * n * n, true, 10, 10, rng, n, 10)
+    val result = optimizer.optimize(new ObjectiveFunction(objectiveFunction))
 
     val finalDistribution = result.getPoint
     normalize(finalDistribution)

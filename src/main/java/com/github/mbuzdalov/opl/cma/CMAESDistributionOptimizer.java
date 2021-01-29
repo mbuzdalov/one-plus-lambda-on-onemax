@@ -23,9 +23,6 @@ public class CMAESDistributionOptimizer {
         return doOptimize();
     }
 
-    // fields from BaseMultivariateOptimizer
-    private double[] start;
-
     // fields from MultivariateOptimizer
     private MultivariateFunction function;
 
@@ -47,7 +44,7 @@ public class CMAESDistributionOptimizer {
     private final int nResamplingUntilFeasble;
 
     /** Number of objective variables/problem dimension */
-    private int dimension;
+    private final int dimension;
 
     /**
      * Defines the number of initial iterations, where the covariance matrix
@@ -143,27 +140,35 @@ public class CMAESDistributionOptimizer {
                                       int nDiagonalOnlyIterations,
                                       int nResamplingUntilFeasible,
                                       RandomGenerator random,
+                                      int dimension,
                                       int populationSize) {
         this.maxIterations = maxIterations;
         this.isActiveCMA = isActiveCMA;
         this.nDiagonalOnlyIterations = nDiagonalOnlyIterations;
         this.nResamplingUntilFeasble = nResamplingUntilFeasible;
         this.random = random;
+        this.dimension = dimension;
         this.populationSize = populationSize;
     }
 
     protected PointValuePair doOptimize() {
         // -------------------- Initialization --------------------------------
         final FitnessFunction fitfun = new FitnessFunction();
-        final double[] guess = start;
-        // number of objective variables/problem dimension
-        dimension = guess.length;
+        final double[] guess = new double[dimension];
+        double guessSum = 0;
+        for (int i = 0; i < dimension; ++i) {
+            guess[i] = random.nextDouble();
+            guessSum += guess[i];
+        }
+        for (int i = 0; i < dimension; ++i) {
+            guess[i] /= guessSum;
+        }
         initializeCMA(guess);
         iterations = 0;
         ValuePenaltyPair valuePenalty = fitfun.value(guess);
-        double bestValue = valuePenalty.value+valuePenalty.penalty;
+        double bestValue = valuePenalty.value + valuePenalty.penalty;
         push(fitnessHistory, bestValue);
-        PointValuePair optimum = new PointValuePair(start, bestValue);
+        PointValuePair optimum = new PointValuePair(guess, bestValue);
 
         // -------------------- Generation Loop --------------------------------
 
@@ -278,29 +283,9 @@ public class CMAESDistributionOptimizer {
         // The existing values (as set by the previous call) are reused if
         // not provided in the argument list.
         for (OptimizationData data : optData) {
-            if (data instanceof InitialGuess) {
-                start = ((InitialGuess) data).getInitialGuess();
-                continue;
-            }
             if (data instanceof ObjectiveFunction) {
                 function = ((ObjectiveFunction) data).getObjectiveFunction();
                 continue;
-            }
-        }
-
-        checkParameters();
-    }
-
-    private void checkParameters() {
-        final int dim = start.length;
-        for (double v : start) {
-            if (v < 0) {
-                throw new NumberIsTooSmallException(v, 0, true);
-            }
-        }
-        for (double v : start) {
-            if (v > 1) {
-                throw new NumberIsTooLargeException(v, 1, true);
             }
         }
     }
