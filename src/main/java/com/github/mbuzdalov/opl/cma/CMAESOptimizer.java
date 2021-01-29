@@ -29,52 +29,12 @@ public class CMAESOptimizer {
     private double[] lowerBound;
     private double[] upperBound;
 
-    /**
-     * Check parameters consistency.
-     */
-    private void checkBaseParameters() {
-        if (start != null) {
-            final int dim = start.length;
-            if (lowerBound != null) {
-                if (lowerBound.length != dim) {
-                    throw new DimensionMismatchException(lowerBound.length, dim);
-                }
-                for (int i = 0; i < dim; i++) {
-                    final double v = start[i];
-                    final double lo = lowerBound[i];
-                    if (v < lo) {
-                        throw new NumberIsTooSmallException(v, lo, true);
-                    }
-                }
-            }
-            if (upperBound != null) {
-                if (upperBound.length != dim) {
-                    throw new DimensionMismatchException(upperBound.length, dim);
-                }
-                for (int i = 0; i < dim; i++) {
-                    final double v = start[i];
-                    final double hi = upperBound[i];
-                    if (v > hi) {
-                        throw new NumberIsTooLargeException(v, hi, true);
-                    }
-                }
-            }
-        }
-    }
-
-
     // fields from MultivariateOptimizer
     private MultivariateFunction function;
 
     // global search parameters
-    /**
-     * Population size, offspring number. The primary strategy parameter to play
-     * with, which can be increased from its default value. Increasing the
-     * population size improves global search properties in exchange to speed.
-     * Speed decreases, as a rule, at most linearly with increasing population
-     * size. It is advisable to begin with the default small population size.
-     */
-    private int lambda; // population size
+    private final int populationSize;
+
     /**
      * Covariance update mechanism, default is active CMA. isActiveCMA = true
      * turns on "active CMA" with a negative update of the covariance matrix and
@@ -87,7 +47,7 @@ public class CMAESOptimizer {
      * Determines how often a new random offspring is generated in case it is
      * not feasible / beyond the defined limits, default is 0.
      */
-    private final int checkFeasableCount;
+    private final int nResamplingUntilFeasble;
     /**
      * @see CMAESOptimizer.Sigma
      */
@@ -102,7 +62,7 @@ public class CMAESOptimizer {
      * particularly useful for dimension > 100.
      * @see <a href="http://hal.archives-ouvertes.fr/inria-00287367/en">A Simple Modification in CMA-ES</a>
      */
-    private int diagonalOnly;
+    private int nDiagonalOnlyIterations;
 
     // termination criteria
     /** Maximal number of iterations allowed. */
@@ -119,8 +79,6 @@ public class CMAESOptimizer {
     // selection strategy parameters
     /** Number of parents/points for recombination. */
     private int mu; //
-    /** log(mu + 0.5), stored for efficiency. */
-    private double logMu2;
     /** Array for weighted recombination. */
     private RealMatrix weights;
     /** Variance-effectiveness of sum w_i x_i. */
@@ -172,8 +130,6 @@ public class CMAESOptimizer {
 
     /** History queue of best values. */
     private double[] fitnessHistory;
-    /** Size of history queue of best values. */
-    private int historySize;
 
     /** Random generator. */
     private final RandomGenerator random;
@@ -181,24 +137,24 @@ public class CMAESOptimizer {
     /**
      * @param maxIterations Maximal number of iterations.
      * @param isActiveCMA Chooses the covariance matrix update method.
-     * @param diagonalOnly Number of initial iterations, where the covariance matrix
-     * remains diagonal.
-     * @param checkFeasableCount Determines how often new random objective variables are
-     * generated in case they are out of bounds.
+     * @param nDiagonalOnlyIterations Number of initial iterations, where the covariance matrix remains diagonal.
+     * @param nResamplingUntilFeasible Determines how often new random objective variables are generated in case they are out of bounds.
      * @param random Random generator.
      *
      * @since 3.1
      */
     public CMAESOptimizer(int maxIterations,
                           boolean isActiveCMA,
-                          int diagonalOnly,
-                          int checkFeasableCount,
-                          RandomGenerator random) {
+                          int nDiagonalOnlyIterations,
+                          int nResamplingUntilFeasible,
+                          RandomGenerator random,
+                          int populationSize) {
         this.maxIterations = maxIterations;
         this.isActiveCMA = isActiveCMA;
-        this.diagonalOnly = diagonalOnly;
-        this.checkFeasableCount = checkFeasableCount;
+        this.nDiagonalOnlyIterations = nDiagonalOnlyIterations;
+        this.nResamplingUntilFeasble = nResamplingUntilFeasible;
         this.random = random;
+        this.populationSize = populationSize;
     }
 
     /**
@@ -240,40 +196,6 @@ public class CMAESOptimizer {
         }
     }
 
-    /**
-     * Population size.
-     * The number of offspring is the primary strategy parameter.
-     * In the absence of better clues, a good default could be an
-     * integer close to {@code 4 + 3 ln(n)}, where {@code n} is the
-     * number of optimized parameters.
-     * Increasing the population size improves global search properties
-     * at the expense of speed (which in general decreases at most
-     * linearly with increasing population size).
-     */
-    public static class PopulationSize implements OptimizationData {
-        /** Population size. */
-        private final int lambda;
-
-        /**
-         * @param size Population size.
-         * @throws NotStrictlyPositiveException if {@code size <= 0}.
-         */
-        public PopulationSize(int size)
-                throws NotStrictlyPositiveException {
-            if (size <= 0) {
-                throw new NotStrictlyPositiveException(size);
-            }
-            lambda = size;
-        }
-
-        /**
-         * @return the population size.
-         */
-        public int getPopulationSize() {
-            return lambda;
-        }
-    }
-
     protected PointValuePair doOptimize() {
         // -------------------- Initialization --------------------------------
         final FitnessFunction fitfun = new FitnessFunction();
@@ -292,23 +214,22 @@ public class CMAESOptimizer {
         generationLoop:
         for (iterations = 1; iterations <= maxIterations; iterations++) {
             // Generate and evaluate lambda offspring
-            final RealMatrix arz = randn1(dimension, lambda);
-            final RealMatrix arx = zeros(dimension, lambda);
-            final double[] fitness = new double[lambda];
-            final ValuePenaltyPair[] valuePenaltyPairs = new ValuePenaltyPair[lambda];
+            final RealMatrix arz = randn1(dimension, populationSize);
+            final RealMatrix arx = zeros(dimension, populationSize);
+            final double[] fitness = new double[populationSize];
+            final ValuePenaltyPair[] valuePenaltyPairs = new ValuePenaltyPair[populationSize];
             // generate random offspring
-            for (int k = 0; k < lambda; k++) {
+            for (int k = 0; k < populationSize; k++) {
                 RealMatrix arxk = null;
-                for (int i = 0; i < checkFeasableCount + 1; i++) {
-                    if (diagonalOnly <= 0) {
+                for (int i = 0; i <= nResamplingUntilFeasble; i++) {
+                    if (nDiagonalOnlyIterations <= 0) {
                         arxk = xmean.add(BD.multiply(arz.getColumnMatrix(k))
                                 .scalarMultiply(sigma)); // m + sig * Normal(0,C)
                     } else {
                         arxk = xmean.add(times(diagD,arz.getColumnMatrix(k))
                                 .scalarMultiply(sigma));
                     }
-                    if (i >= checkFeasableCount ||
-                            fitfun.isFeasible(arxk.getColumn(0))) {
+                    if (i >= nResamplingUntilFeasble || fitfun.isFeasible(arxk.getColumn(0))) {
                         break;
                     }
                     // regenerate random arguments for row
@@ -337,7 +258,7 @@ public class CMAESOptimizer {
             final RealMatrix bestArz = selectColumns(arz, MathArrays.copyOf(arindex, mu));
             final RealMatrix zmean = bestArz.multiply(weights);
             final boolean hsig = updateEvolutionPaths(zmean, xold);
-            if (diagonalOnly <= 0) {
+            if (nDiagonalOnlyIterations <= 0) {
                 updateCovariance(hsig, bestArx, arz, arindex, xold);
             } else {
                 updateCovarianceDiagonalOnly(hsig, bestArz);
@@ -382,7 +303,7 @@ public class CMAESOptimizer {
                 break generationLoop;
             }
             // Adjust step size in case of equal function values (flat fitness)
-            if (bestValue == fitness[arindex[(int)(0.1+lambda/4.)]]) {
+            if (bestValue == fitness[arindex[(int)(0.1+ populationSize /4.)]]) {
                 sigma *= FastMath.exp(0.2 + cs / damps);
             }
             if (iterations > 2 && FastMath.max(historyWorst, bestFitness) -
@@ -419,32 +340,35 @@ public class CMAESOptimizer {
                 inputSigma = ((Sigma) data).getSigma();
                 continue;
             }
-            if (data instanceof PopulationSize) {
-                lambda = ((PopulationSize) data).getPopulationSize();
-                continue;
-            }
         }
 
-        checkBaseParameters();
         checkParameters();
     }
 
-    /**
-     * Checks dimensions and values of boundaries and inputSigma if defined.
-     */
     private void checkParameters() {
-        final double[] init = start;
-        final double[] lB = lowerBound;
-        final double[] uB = upperBound;
-
-        if (inputSigma != null) {
-            if (inputSigma.length != init.length) {
-                throw new DimensionMismatchException(inputSigma.length, init.length);
+        final int dim = start.length;
+        if (lowerBound.length != dim) {
+            throw new DimensionMismatchException(lowerBound.length, dim);
+        }
+        for (int i = 0; i < dim; i++) {
+            if (start[i] < lowerBound[i]) {
+                throw new NumberIsTooSmallException(start[i], lowerBound[i], true);
             }
-            for (int i = 0; i < init.length; i++) {
-                if (inputSigma[i] > uB[i] - lB[i]) {
-                    throw new OutOfRangeException(inputSigma[i], 0, uB[i] - lB[i]);
-                }
+        }
+        if (upperBound.length != dim) {
+            throw new DimensionMismatchException(upperBound.length, dim);
+        }
+        for (int i = 0; i < dim; i++) {
+            if (start[i] > upperBound[i]) {
+                throw new NumberIsTooLargeException(start[i], upperBound[i], true);
+            }
+        }
+        if (inputSigma.length != dim) {
+            throw new DimensionMismatchException(inputSigma.length, start.length);
+        }
+        for (int i = 0; i < dim; i++) {
+            if (inputSigma[i] > upperBound[i] - lowerBound[i]) {
+                throw new OutOfRangeException(inputSigma[i], 0, upperBound[i] - lowerBound[i]);
             }
         }
     }
@@ -455,8 +379,8 @@ public class CMAESOptimizer {
      * @param guess Initial guess for the arguments of the fitness function.
      */
     private void initializeCMA(double[] guess) {
-        if (lambda <= 0) {
-            throw new NotStrictlyPositiveException(lambda);
+        if (populationSize <= 0) {
+            throw new NotStrictlyPositiveException(populationSize);
         }
         // initialize sigma
         final double[][] sigmaArray = new double[guess.length][1];
@@ -473,9 +397,8 @@ public class CMAESOptimizer {
         stopTolHistFun = 1e-13;
 
         // initialize selection strategy parameters
-        mu = lambda / 2; // number of parents/points for recombination
-        logMu2 = FastMath.log(mu + 0.5);
-        weights = log(sequence(1, mu, 1)).scalarMultiply(-1).scalarAdd(logMu2);
+        mu = populationSize / 2; // number of parents/points for recombination
+        weights = log(sequence(1, mu, 1)).scalarMultiply(-1).scalarAdd(FastMath.log(mu + 0.5));
         double sumw = 0;
         double sumwq = 0;
         for (int i = 0; i < mu; i++) {
@@ -513,7 +436,8 @@ public class CMAESOptimizer {
         D = ones(dimension, 1); // diagonal D defines the scaling
         BD = times(B, repmat(diagD.transpose(), dimension, 1));
         C = B.multiply(diag(square(D)).multiply(B.transpose())); // covariance
-        historySize = 10 + (int) (3 * 10 * dimension / (double) lambda);
+
+        int historySize = 10 + (int) (3 * 10 * dimension / (double) populationSize);
         fitnessHistory = new double[historySize]; // history of fitness values
         for (int i = 0; i < historySize; i++) {
             fitnessHistory[i] = Double.MAX_VALUE;
@@ -560,10 +484,10 @@ public class CMAESOptimizer {
                 .add((times(diagC, square(bestArz).multiply(weights))) // plus rank mu update
                         .scalarMultiply(ccovmuSep));
         diagD = sqrt(diagC); // replaces eig(C)
-        if (diagonalOnly > 1 &&
-                iterations > diagonalOnly) {
+        if (nDiagonalOnlyIterations > 1 &&
+                iterations > nDiagonalOnlyIterations) {
             // full covariance matrix from now on
-            diagonalOnly = 0;
+            nDiagonalOnlyIterations = 0;
             B = eye(dimension, dimension);
             BD = diag(diagD);
             C = diag(diagC);
@@ -772,7 +696,7 @@ public class CMAESOptimizer {
         @Override
         public int hashCode() {
             long bits = Double.doubleToLongBits(value);
-            return (int) ((1438542 ^ (bits >>> 32) ^ bits) & 0xffffffff);
+            return (int) (1438542 ^ bits >>> 32 ^ bits);
         }
     }
     /**
@@ -780,9 +704,9 @@ public class CMAESOptimizer {
      */
     private static class ValuePenaltyPair {
         /** Objective function value. */
-        private double value;
+        private final double value;
         /** Penalty value for repair of out out of bounds points. */
-        private double penalty;
+        private final double penalty;
 
         /**
          * @param value Function value.
@@ -853,18 +777,11 @@ public class CMAESOptimizer {
          * @return the repaired (i.e. all in bounds) objective variables.
          */
         private double[] repair(final double[] x) {
-            final double[] lB = lowerBound;
-            final double[] uB = upperBound;
-
             final double[] repaired = new double[x.length];
             for (int i = 0; i < x.length; i++) {
-                if (x[i] < lB[i]) {
-                    repaired[i] = lB[i];
-                } else if (x[i] > uB[i]) {
-                    repaired[i] = uB[i];
-                } else {
-                    repaired[i] = x[i];
-                }
+                if (x[i] < lowerBound[i]) {
+                    repaired[i] = lowerBound[i];
+                } else repaired[i] = Math.min(x[i], upperBound[i]);
             }
             return repaired;
         }
@@ -1034,8 +951,7 @@ public class CMAESOptimizer {
      * @param m2 Target matrix.
      * @param col2 Target column.
      */
-    private static void copyColumn(final RealMatrix m1, int col1,
-                                   RealMatrix m2, int col2) {
+    private static void copyColumn(final RealMatrix m1, int col1, RealMatrix m2, int col2) {
         for (int i = 0; i < m1.getRowDimension(); i++) {
             m2.setEntry(i, col2, m1.getEntry(i, col1));
         }
@@ -1153,10 +1069,10 @@ public class CMAESOptimizer {
      * @return the maximum of the array values.
      */
     private static double max(final double[] m) {
-        double max = -Double.MAX_VALUE;
-        for (int r = 0; r < m.length; r++) {
-            if (max < m[r]) {
-                max = m[r];
+        double max = Double.MIN_VALUE;
+        for (double v : m) {
+            if (max < v) {
+                max = v;
             }
         }
         return max;
@@ -1168,9 +1084,9 @@ public class CMAESOptimizer {
      */
     private static double min(final double[] m) {
         double min = Double.MAX_VALUE;
-        for (int r = 0; r < m.length; r++) {
-            if (min > m[r]) {
-                min = m[r];
+        for (double v : m) {
+            if (min > v) {
+                min = v;
             }
         }
         return min;
