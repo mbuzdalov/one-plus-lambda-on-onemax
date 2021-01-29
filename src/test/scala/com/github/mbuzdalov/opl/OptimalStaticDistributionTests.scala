@@ -17,8 +17,8 @@ class OptimalStaticDistributionTests extends AnyFlatSpec with Matchers {
   it should "be found correctly for n=10, lambda=4" in {
     val result = OptimalStaticDistribution.findOptimalDistribution(10, 4, new MersenneTwister())
     result.fitness shouldBe (8.06115492800143 +- 1e-9)
-    result.distribution(0) shouldBe (0.9828011749325332 +- 1e-9)
-    result.distribution(9) shouldBe (0.01719882506746691 +- 1e-9)
+    result.distribution(0) shouldBe (0.9828011749325332 +- 1e-8)
+    result.distribution(9) shouldBe (0.01719882506746691 +- 1e-8)
     for (i <- 1 until 8) {
       result.distribution(i) shouldBe (0.0 +- 1e-15)
     }
