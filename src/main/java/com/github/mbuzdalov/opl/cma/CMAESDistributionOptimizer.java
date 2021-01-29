@@ -122,6 +122,10 @@ public class CMAESDistributionOptimizer {
                                       int dimension,
                                       int populationSize,
                                       MultivariateFunction function) {
+        if (populationSize <= 0) {
+            throw new NotStrictlyPositiveException(populationSize);
+        }
+
         this.maxIterations = maxIterations;
         this.isActiveCMA = isActiveCMA;
         this.nDiagonalOnlyIterations = nDiagonalOnlyIterations;
@@ -134,7 +138,6 @@ public class CMAESDistributionOptimizer {
 
     public PointValuePair optimize() {
         // -------------------- Initialization --------------------------------
-        final FitnessFunction fitfun = new FitnessFunction();
         final double[] guess = new double[dimension];
         double guessSum = 0;
         for (int i = 0; i < dimension; ++i) {
@@ -146,7 +149,7 @@ public class CMAESDistributionOptimizer {
         }
         initializeCMA(guess);
         iterations = 0;
-        ValuePenaltyPair valuePenalty = fitfun.value(guess);
+        ValuePenaltyPair valuePenalty = valueAndPenalty(guess);
         double bestValue = valuePenalty.value + valuePenalty.penalty;
         push(fitnessHistory, bestValue);
         PointValuePair optimum = new PointValuePair(guess, bestValue);
@@ -171,18 +174,14 @@ public class CMAESDistributionOptimizer {
                         arxk = xmean.add(times(diagD,arz.getColumnMatrix(k))
                                 .scalarMultiply(sigma));
                     }
-                    if (i >= nResamplingUntilFeasible || fitfun.isFeasible(arxk.getColumn(0))) {
+                    if (i >= nResamplingUntilFeasible || isFeasible(arxk.getColumn(0))) {
                         break;
                     }
                     // regenerate random arguments for row
                     arz.setColumn(k, randn(dimension));
                 }
                 copyColumn(arxk, 0, arx, k);
-                try {
-                    valuePenaltyPairs[k] = fitfun.value(arx.getColumn(k)); // compute fitness
-                } catch (TooManyEvaluationsException e) {
-                    break generationLoop;
-                }
+                valuePenaltyPairs[k] = valueAndPenalty(arx.getColumn(k)); // compute fitness
             }
 
             // Compute fitnesses by adding value and penalty after scaling by value range.
@@ -211,7 +210,7 @@ public class CMAESDistributionOptimizer {
             final double worstFitness = fitness[arindex[arindex.length - 1]];
             if (bestValue > bestFitness) {
                 bestValue = bestFitness;
-                optimum = new PointValuePair(fitfun.repair(bestArx.getColumn(0)), bestFitness);
+                optimum = new PointValuePair(repair(bestArx.getColumn(0)), bestFitness);
             }
             // handle termination criteria
             final double[] sqrtDiagC = sqrt(diagC).getColumn(0);
@@ -264,9 +263,6 @@ public class CMAESDistributionOptimizer {
      * @param guess Initial guess for the arguments of the fitness function.
      */
     private void initializeCMA(double[] guess) {
-        if (populationSize <= 0) {
-            throw new NotStrictlyPositiveException(populationSize);
-        }
         sigma = 1;
 
         // initialize termination criteria
@@ -597,65 +593,41 @@ public class CMAESDistributionOptimizer {
         }
     }
 
+    private ValuePenaltyPair valueAndPenalty(final double[] point) {
+        double[] repaired = repair(point);
+        double value = function.value(repaired);
+        double penalty = penalty(point, repaired);
+        return new ValuePenaltyPair(value,penalty);
+    }
 
-    /**
-     * Normalizes fitness values to the range [0,1]. Adds a penalty to the
-     * fitness value if out of range.
-     */
-    private class FitnessFunction {
-        /**
-         * @param point Normalized objective variables.
-         * @return the objective value + penalty for violated bounds.
-         */
-        public ValuePenaltyPair value(final double[] point) {
-            double[] repaired = repair(point);
-            double value = function.value(repaired);
-            double penalty =  penalty(point, repaired);
-            return new ValuePenaltyPair(value,penalty);
-        }
-
-        /**
-         * @param x Normalized objective variables.
-         * @return {@code true} if in bounds.
-         */
-        public boolean isFeasible(final double[] x) {
-            for (double v : x) {
-                if (v < 0 || v > 1) {
-                    return false;
-                }
+    private static boolean isFeasible(final double[] x) {
+        for (double v : x) {
+            if (v < 0 || v > 1) {
+                return false;
             }
-            return true;
         }
+        return true;
+    }
 
-        /**
-         * @param x Normalized objective variables.
-         * @return the repaired (i.e. all in bounds) objective variables.
-         */
-        private double[] repair(final double[] x) {
-            final double[] repaired = new double[x.length];
-            for (int i = 0; i < x.length; i++) {
-                if (x[i] < 0) {
-                    repaired[i] = 0;
-                } else {
-                    repaired[i] = Math.min(x[i], 1);
-                }
+    private static double[] repair(final double[] x) {
+        final double[] repaired = new double[x.length];
+        for (int i = 0; i < x.length; i++) {
+            if (x[i] < 0) {
+                repaired[i] = 0;
+            } else {
+                repaired[i] = Math.min(x[i], 1);
             }
-            return repaired;
         }
+        return repaired;
+    }
 
-        /**
-         * @param x Normalized objective variables.
-         * @param repaired Repaired objective variables.
-         * @return Penalty value according to the violation of the bounds.
-         */
-        private double penalty(final double[] x, final double[] repaired) {
-            double penalty = 0;
-            for (int i = 0; i < x.length; i++) {
-                double diff = FastMath.abs(x[i] - repaired[i]);
-                penalty += diff;
-            }
-            return penalty;
+    private static double penalty(final double[] x, final double[] repaired) {
+        double penalty = 0;
+        for (int i = 0; i < x.length; i++) {
+            double diff = FastMath.abs(x[i] - repaired[i]);
+            penalty += diff;
         }
+        return penalty;
     }
 
     // -----Matrix utility functions similar to the Matlab build in functions------
