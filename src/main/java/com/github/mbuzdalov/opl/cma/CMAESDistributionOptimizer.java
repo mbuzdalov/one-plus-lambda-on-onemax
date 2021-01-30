@@ -43,7 +43,6 @@ public class CMAESDistributionOptimizer {
 
     private RealMatrix pc;
     private RealMatrix ps;
-    private final RealMatrix B;
     private RealMatrix diagD;
     private RealMatrix diagC;
 
@@ -107,7 +106,6 @@ public class CMAESDistributionOptimizer {
         diagC = square(diagD);
         pc = zeros(dimension, 1);
         ps = zeros(dimension, 1);
-        B = eye(dimension, dimension);
 
         int historySize = 10 + (int) (3 * 10 * dimension / (double) populationSize);
         this.fitnessHistory = new FitnessHistory(historySize);
@@ -169,7 +167,7 @@ public class CMAESDistributionOptimizer {
             final RealMatrix zMean = bestArz.multiply(weights);
 
             double q1 = Math.sqrt(cs * (2 - cs) * mueff);
-            ps = ps.scalarMultiply(1 - cs).add(B.multiply(zMean).scalarMultiply(q1));
+            ps = ps.scalarMultiply(1 - cs).add(zMean.scalarMultiply(q1));
             double normPS = ps.getFrobeniusNorm();
             boolean hSig = normPS / Math.sqrt(1 - Math.pow(1 - cs, 2 * iterations)) / chiN < 1.4 + 2 / (dimension + 1.0);
             double q2 = hSig ? Math.sqrt(cc * (2 - cc) * mueff) / sigma : 0;
@@ -409,16 +407,6 @@ public class CMAESDistributionOptimizer {
         final double[][] d = new double[n][1];
         for (int r = 0; r < n; r++) {
             Arrays.fill(d[r], 1);
-        }
-        return new Array2DRowRealMatrix(d, false);
-    }
-
-    private static RealMatrix eye(int n, int m) {
-        final double[][] d = new double[n][m];
-        for (int r = 0; r < n; r++) {
-            if (r < m) {
-                d[r][r] = 1;
-            }
         }
         return new Array2DRowRealMatrix(d, false);
     }
