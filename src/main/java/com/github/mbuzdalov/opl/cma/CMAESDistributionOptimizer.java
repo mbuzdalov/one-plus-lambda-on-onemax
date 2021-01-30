@@ -9,7 +9,6 @@ import org.apache.commons.math3.linear.MatrixUtils;
 import org.apache.commons.math3.linear.RealMatrix;
 import org.apache.commons.math3.optim.PointValuePair;
 import org.apache.commons.math3.random.RandomGenerator;
-import org.apache.commons.math3.util.FastMath;
 import org.apache.commons.math3.util.MathArrays;
 
 public class CMAESDistributionOptimizer {
@@ -87,7 +86,7 @@ public class CMAESDistributionOptimizer {
 
         // initialize selection strategy parameters
         this.mu = populationSize / 2;
-        RealMatrix rawWeights = log(naturals(mu)).scalarMultiply(-1).scalarAdd(FastMath.log(mu + 0.5));
+        RealMatrix rawWeights = log(naturals(mu)).scalarMultiply(-1).scalarAdd(Math.log(mu + 0.5));
         double sumW = 0;
         double sumWQ = 0;
         for (int i = 0; i < mu; i++) {
@@ -101,13 +100,13 @@ public class CMAESDistributionOptimizer {
         // initialize parameters and constants
         this.cc = (4 + mueff / dimension) / (dimension + 4 + 2 * mueff / dimension);
         this.cs = (mueff + 2) / (dimension + mueff + 3);
-        this.damps = (1 + 2 * FastMath.max(0, FastMath.sqrt((mueff - 1) / (dimension + 1)) - 1)) *
-                FastMath.max(0.3, 1 - dimension / (1e-6 + maxIterations)) + cs;
+        this.damps = (1 + 2 * Math.max(0, Math.sqrt((mueff - 1) / (dimension + 1)) - 1)) *
+                Math.max(0.3, 1 - dimension / (1e-6 + maxIterations)) + cs;
         double ccov1 = 2 / ((dimension + 1.3) * (dimension + 1.3) + mueff);
-        double ccovmu = FastMath.min(1 - ccov1, 2 * (mueff - 2 + 1 / mueff) / ((dimension + 2) * (dimension + 2) + mueff));
-        this.ccov1Sep = FastMath.min(1, ccov1 * (dimension + 1.5) / 3);
-        this.ccovmuSep = FastMath.min(1 - ccov1, ccovmu * (dimension + 1.5) / 3);
-        this.chiN = FastMath.sqrt(dimension) * (1 - 1 / (4.0 * dimension) + 1 / (21.0 * dimension * dimension));
+        double ccovmu = Math.min(1 - ccov1, 2 * (mueff - 2 + 1 / mueff) / ((dimension + 2) * (dimension + 2) + mueff));
+        this.ccov1Sep = Math.min(1, ccov1 * (dimension + 1.5) / 3);
+        this.ccovmuSep = Math.min(1 - ccov1, ccovmu * (dimension + 1.5) / 3);
+        this.chiN = Math.sqrt(dimension) * (1 - 1 / (4.0 * dimension) + 1 / (21.0 * dimension * dimension));
 
         // initialize matrices and vectors that change
         diagD = columnOfOnes(dimension).scalarMultiply(1 / sigma);
@@ -178,7 +177,7 @@ public class CMAESDistributionOptimizer {
             final boolean hsig = updateEvolutionPaths(zmean, xold);
             updateCovarianceDiagonalOnly(hsig, bestArz);
             // Adapt step size sigma - Eq. (5)
-            sigma *= FastMath.exp(FastMath.min(1, (normps/chiN - 1) * cs / damps));
+            sigma *= Math.exp(Math.min(1, (normps/chiN - 1) * cs / damps));
             final double bestFitness = fitness[arindex[0]];
             final double worstFitness = fitness[arindex[arindex.length - 1]];
             if (bestValue > bestFitness) {
@@ -186,7 +185,7 @@ public class CMAESDistributionOptimizer {
                 optimum = new PointValuePair(repair(bestArx.getColumn(0)), bestFitness);
             }
             // handle termination criteria
-            if (shallExitBySigmaTolerance(pc.getColumn(0), sqrt(diagC).getColumn(0))) {
+            if (shallExitBySigmaTolerance(pc.getColumn(0), diagD.getColumn(0))) {
                 break;
             }
             final double historyBest = fitnessHistory.getMinimum();
@@ -203,10 +202,10 @@ public class CMAESDistributionOptimizer {
             }
             // Adjust step size in case of equal function values (flat fitness)
             if (bestValue == fitness[arindex[(int) (0.1 + populationSize / 4.0)]]) {
-                sigma *= FastMath.exp(0.2 + cs / damps);
+                sigma *= Math.exp(0.2 + cs / damps);
             }
-            if (iterations > 2 && FastMath.max(historyWorst, bestFitness) - FastMath.min(historyBest, bestFitness) == 0) {
-                sigma *= FastMath.exp(0.2 + cs / damps);
+            if (iterations > 2 && Math.max(historyWorst, bestFitness) - Math.min(historyBest, bestFitness) == 0) {
+                sigma *= Math.exp(0.2 + cs / damps);
             }
             // store best in history
             fitnessHistory.push(bestFitness);
@@ -214,14 +213,14 @@ public class CMAESDistributionOptimizer {
         return optimum;
     }
 
-    private boolean shallExitBySigmaTolerance(double[] pcCol, double[] sqrtDiagC) {
+    private boolean shallExitBySigmaTolerance(double[] pcCol, double[] diagD) {
         for (int i = 0; i < dimension; i++) {
-            if (sigma * sqrtDiagC[i] > stopTolUpX) {
+            if (sigma * diagD[i] > stopTolUpX) {
                 return true;
             }
         }
         for (int i = 0; i < dimension; i++) {
-            if (sigma * FastMath.max(FastMath.abs(pcCol[i]), sqrtDiagC[i]) > stopTolX) {
+            if (sigma * Math.max(Math.abs(pcCol[i]), diagD[i]) > stopTolX) {
                 return false;
             }
         }
@@ -242,13 +241,13 @@ public class CMAESDistributionOptimizer {
     }
 
     private boolean updateEvolutionPaths(RealMatrix zmean, RealMatrix xold) {
-        ps = ps.scalarMultiply(1 - cs).add(B.multiply(zmean).scalarMultiply(FastMath.sqrt(cs * (2 - cs) * mueff)));
+        ps = ps.scalarMultiply(1 - cs).add(B.multiply(zmean).scalarMultiply(Math.sqrt(cs * (2 - cs) * mueff)));
         normps = ps.getFrobeniusNorm();
-        final boolean hSig = normps / FastMath.sqrt(1 - FastMath.pow(1 - cs, 2 * iterations)) / chiN
+        final boolean hSig = normps / Math.sqrt(1 - Math.pow(1 - cs, 2 * iterations)) / chiN
                 < 1.4 + 2 / (dimension + 1.0);
         pc = pc.scalarMultiply(1 - cc);
         if (hSig) {
-            pc = pc.add(xmean.subtract(xold).scalarMultiply(FastMath.sqrt(cc * (2 - cc) * mueff) / sigma));
+            pc = pc.add(xmean.subtract(xold).scalarMultiply(Math.sqrt(cc * (2 - cc) * mueff) / sigma));
         }
         return hSig;
     }
@@ -314,7 +313,7 @@ public class CMAESDistributionOptimizer {
     private static double penalty(final double[] x, final double[] repaired) {
         double penalty = 0;
         for (int i = 0; i < x.length; i++) {
-            double diff = FastMath.abs(x[i] - repaired[i]);
+            double diff = Math.abs(x[i] - repaired[i]);
             penalty += diff;
         }
         return penalty;
@@ -377,7 +376,7 @@ public class CMAESDistributionOptimizer {
         final double[][] d = new double[m.getRowDimension()][m.getColumnDimension()];
         for (int r = 0; r < m.getRowDimension(); r++) {
             for (int c = 0; c < m.getColumnDimension(); c++) {
-                d[r][c] = FastMath.log(m.getEntry(r, c));
+                d[r][c] = Math.log(m.getEntry(r, c));
             }
         }
         return new Array2DRowRealMatrix(d, false);
@@ -387,7 +386,7 @@ public class CMAESDistributionOptimizer {
         final double[][] d = new double[m.getRowDimension()][m.getColumnDimension()];
         for (int r = 0; r < m.getRowDimension(); r++) {
             for (int c = 0; c < m.getColumnDimension(); c++) {
-                d[r][c] = FastMath.sqrt(m.getEntry(r, c));
+                d[r][c] = Math.sqrt(m.getEntry(r, c));
             }
         }
         return new Array2DRowRealMatrix(d, false);
