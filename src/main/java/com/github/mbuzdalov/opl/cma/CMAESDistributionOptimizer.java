@@ -38,15 +38,9 @@ public class CMAESDistributionOptimizer {
     private final double ccov1Sep;
     private final double ccovmuSep;
 
-    // Number of iterations done so far.
-    private int iterations;
-
     // Varying auto-inferred parameters.
     private double sigma;
-    private double normps;
 
-    // Vectors and matrices.
-    private RealMatrix xmean;
     private RealMatrix pc;
     private RealMatrix ps;
     private final RealMatrix B;
@@ -113,7 +107,6 @@ public class CMAESDistributionOptimizer {
         diagC = square(diagD);
         pc = zeros(dimension, 1);
         ps = zeros(dimension, 1);
-        normps = ps.getFrobeniusNorm();
         B = eye(dimension, dimension);
 
         int historySize = 10 + (int) (3 * 10 * dimension / (double) populationSize);
@@ -121,7 +114,6 @@ public class CMAESDistributionOptimizer {
     }
 
     public PointValuePair optimize() {
-        iterations = 0;
         double[] guess = generateNormalizedRandomVector();
         double bestValue;
         {
@@ -130,13 +122,14 @@ public class CMAESDistributionOptimizer {
             function.accept(new double[][] {fixedGuess}, fitnessHolder);
             bestValue = fitnessHolder[0] + penalty(guess, fixedGuess);
         }
-        xmean = MatrixUtils.createColumnRealMatrix(guess);
+        // Vectors and matrices.
+        RealMatrix xMean = MatrixUtils.createColumnRealMatrix(guess);
         fitnessHistory.push(bestValue);
         PointValuePair optimum = new PointValuePair(guess, bestValue);
 
         // -------------------- Generation Loop --------------------------------
 
-        for (iterations = 1; iterations <= maxIterations; iterations++) {
+        for (int iterations = 1; iterations <= maxIterations; ++iterations) {
             // Generate and evaluate lambda offspring
             final RealMatrix arz = gaussianMatrix(dimension, populationSize);
             final RealMatrix arx = zeros(dimension, populationSize);
@@ -147,7 +140,7 @@ public class CMAESDistributionOptimizer {
             // generate random offspring
             for (int k = 0; k < populationSize; k++) {
                 for (int i = 0; i <= nResamplingUntilFeasible; i++) {
-                    arx.setColumnMatrix(k, xmean.add(times(diagD, arz.getColumnMatrix(k)).scalarMultiply(sigma)));
+                    arx.setColumnMatrix(k, xMean.add(times(diagD, arz.getColumnMatrix(k)).scalarMultiply(sigma)));
                     if (i >= nResamplingUntilFeasible || isFeasible(arx.getColumn(k))) {
                         break;
                     }
@@ -166,18 +159,29 @@ public class CMAESDistributionOptimizer {
                 fitness[i] = rawFitness[i] + penalties[i] * valueRange;
             }
 
-            // Sort by fitness and compute weighted mean into xmean
+            // Sort by fitness and compute weighted mean into xMean
             final int[] arindex = sortedIndices(fitness);
-            // Calculate new xmean, this is selection and recombination
-            final RealMatrix xold = xmean; // for speed up of Eq. (2) and (3)
+            // Calculate new xMean, this is selection and recombination
+            final RealMatrix xOld = xMean; // for speed up of Eq. (2) and (3)
             final RealMatrix bestArx = selectColumns(arx, MathArrays.copyOf(arindex, mu));
-            xmean = bestArx.multiply(weights);
+            xMean = bestArx.multiply(weights);
             final RealMatrix bestArz = selectColumns(arz, MathArrays.copyOf(arindex, mu));
-            final RealMatrix zmean = bestArz.multiply(weights);
-            final boolean hsig = updateEvolutionPaths(zmean, xold);
-            updateCovarianceDiagonalOnly(hsig, bestArz);
+            final RealMatrix zMean = bestArz.multiply(weights);
+
+            double q1 = Math.sqrt(cs * (2 - cs) * mueff);
+            ps = ps.scalarMultiply(1 - cs).add(B.multiply(zMean).scalarMultiply(q1));
+            double normPS = ps.getFrobeniusNorm();
+            boolean hSig = normPS / Math.sqrt(1 - Math.pow(1 - cs, 2 * iterations)) / chiN < 1.4 + 2 / (dimension + 1.0);
+            double q2 = hSig ? Math.sqrt(cc * (2 - cc) * mueff) / sigma : 0;
+            pc = pc.scalarMultiply(1 - cc).add(xMean.subtract(xOld).scalarMultiply(q2));
+            double oldFac = (1 - ccov1Sep - ccovmuSep) + (hSig ? 0 : ccov1Sep * cc * (2 - cc));
+            diagC = diagC.scalarMultiply(oldFac) // regard old matrix
+                    .add(square(pc).scalarMultiply(ccov1Sep)) // plus rank one update
+                    .add((times(diagC, square(bestArz).multiply(weights))) // plus rank mu update
+                            .scalarMultiply(ccovmuSep));
+            diagD = sqrt(diagC); // replaces eig(C)
             // Adapt step size sigma - Eq. (5)
-            sigma *= Math.exp(Math.min(1, (normps/chiN - 1) * cs / damps));
+            sigma *= Math.exp(Math.min(1, (normPS/chiN - 1) * cs / damps));
             final double bestFitness = fitness[arindex[0]];
             final double worstFitness = fitness[arindex[arindex.length - 1]];
             if (bestValue > bestFitness) {
@@ -238,28 +242,6 @@ public class CMAESDistributionOptimizer {
             guess[i] /= guessSum;
         }
         return guess;
-    }
-
-    private boolean updateEvolutionPaths(RealMatrix zmean, RealMatrix xold) {
-        ps = ps.scalarMultiply(1 - cs).add(B.multiply(zmean).scalarMultiply(Math.sqrt(cs * (2 - cs) * mueff)));
-        normps = ps.getFrobeniusNorm();
-        final boolean hSig = normps / Math.sqrt(1 - Math.pow(1 - cs, 2 * iterations)) / chiN
-                < 1.4 + 2 / (dimension + 1.0);
-        pc = pc.scalarMultiply(1 - cc);
-        if (hSig) {
-            pc = pc.add(xmean.subtract(xold).scalarMultiply(Math.sqrt(cc * (2 - cc) * mueff) / sigma));
-        }
-        return hSig;
-    }
-
-    private void updateCovarianceDiagonalOnly(boolean hSig, final RealMatrix bestArz) {
-        double oldFac = hSig ? 0 : ccov1Sep * cc * (2 - cc);
-        oldFac += 1 - ccov1Sep - ccovmuSep;
-        diagC = diagC.scalarMultiply(oldFac) // regard old matrix
-                .add(square(pc).scalarMultiply(ccov1Sep)) // plus rank one update
-                .add((times(diagC, square(bestArz).multiply(weights))) // plus rank mu update
-                        .scalarMultiply(ccovmuSep));
-        diagD = sqrt(diagC); // replaces eig(C)
     }
 
     private static int[] sortedIndices(final double[] doubles) {
