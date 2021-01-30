@@ -3,14 +3,13 @@ package com.github.mbuzdalov.opl.cma;
 import java.util.Arrays;
 import java.util.function.BiConsumer;
 
-import org.apache.commons.math3.exception.NotStrictlyPositiveException;
-import org.apache.commons.math3.linear.Array2DRowRealMatrix;
-import org.apache.commons.math3.linear.MatrixUtils;
-import org.apache.commons.math3.linear.RealMatrix;
 import org.apache.commons.math3.optim.PointValuePair;
 import org.apache.commons.math3.random.RandomGenerator;
-import org.apache.commons.math3.util.MathArrays;
 
+/**
+ * This class implements a separable CMA-ES optimizer derived from the Apache Math version
+ * and refactored to suit the needs of this project.
+ */
 public class CMAESDistributionOptimizer {
     // Main user input parameters.
     private final int populationSize;
@@ -29,22 +28,23 @@ public class CMAESDistributionOptimizer {
 
     // Fixed auto-inferred parameters.
     private final int mu;
-    private final RealMatrix weights;
-    private final double mueff;
+    private final double[] weights;
+    private final double muEff;
     private final double cc;
     private final double cs;
     private final double damps;
     private final double chiN;
-    private final double ccov1Sep;
-    private final double ccovmuSep;
+    private final double cCov1Sep;
+    private final double cCovMuSep;
 
     // Varying auto-inferred parameters.
     private double sigma;
 
-    private RealMatrix pc;
-    private RealMatrix ps;
-    private RealMatrix diagD;
-    private RealMatrix diagC;
+    // Vectors and matrices.
+    private final double[] pc;
+    private final double[] ps;
+    private final double[] D;
+    private final double[] C;
 
     /** History queue of best values. */
     private final FitnessHistory fitnessHistory;
@@ -53,13 +53,13 @@ public class CMAESDistributionOptimizer {
     private final RandomGenerator random;
 
     public CMAESDistributionOptimizer(int maxIterations,
-                                      int nResamplingUntilFeasible,
-                                      RandomGenerator random,
-                                      int dimension,
-                                      int populationSize,
-                                      BiConsumer<double[][], double[]> function) {
+                                       int nResamplingUntilFeasible,
+                                       RandomGenerator random,
+                                       int dimension,
+                                       int populationSize,
+                                       BiConsumer<double[][], double[]> function) {
         if (populationSize <= 0) {
-            throw new NotStrictlyPositiveException(populationSize);
+            throw new IllegalArgumentException("Population size must be positive, found " + populationSize);
         }
 
         this.maxIterations = maxIterations;
@@ -79,115 +79,130 @@ public class CMAESDistributionOptimizer {
 
         // initialize selection strategy parameters
         this.mu = populationSize / 2;
-        RealMatrix rawWeights = log(naturals(mu)).scalarMultiply(-1).scalarAdd(Math.log(mu + 0.5));
+        this.weights = new double[mu];
         double sumW = 0;
         double sumWQ = 0;
-        for (int i = 0; i < mu; i++) {
-            double w = rawWeights.getEntry(i, 0);
+        for (int i = 0; i < mu; ++i) {
+            double w = Math.log(mu + 0.5) - Math.log(i + 1);
+            weights[i] = w;
             sumW += w;
             sumWQ += w * w;
         }
-        this.weights = rawWeights.scalarMultiply(1 / sumW);
-        this.mueff = sumW * sumW / sumWQ;
+        for (int i = 0; i < mu; ++i) {
+            weights[i] /= sumW;
+        }
+        this.muEff = sumW * sumW / sumWQ;
 
         // initialize parameters and constants
-        this.cc = (4 + mueff / dimension) / (dimension + 4 + 2 * mueff / dimension);
-        this.cs = (mueff + 2) / (dimension + mueff + 3);
-        this.damps = (1 + 2 * Math.max(0, Math.sqrt((mueff - 1) / (dimension + 1)) - 1)) *
+        this.cc = (4 + muEff / dimension) / (dimension + 4 + 2 * muEff / dimension);
+        this.cs = (muEff + 2) / (dimension + muEff + 3);
+        this.damps = (1 + 2 * Math.max(0, Math.sqrt((muEff - 1) / (dimension + 1)) - 1)) *
                 Math.max(0.3, 1 - dimension / (1e-6 + maxIterations)) + cs;
-        double ccov1 = 2 / ((dimension + 1.3) * (dimension + 1.3) + mueff);
-        double ccovmu = Math.min(1 - ccov1, 2 * (mueff - 2 + 1 / mueff) / ((dimension + 2) * (dimension + 2) + mueff));
-        this.ccov1Sep = Math.min(1, ccov1 * (dimension + 1.5) / 3);
-        this.ccovmuSep = Math.min(1 - ccov1, ccovmu * (dimension + 1.5) / 3);
+        double cCov1 = 2 / ((dimension + 1.3) * (dimension + 1.3) + muEff);
+        double cCovMu = Math.min(1 - cCov1, 2 * (muEff - 2 + 1 / muEff) / ((dimension + 2) * (dimension + 2) + muEff));
+        this.cCov1Sep = Math.min(1, cCov1 * (dimension + 1.5) / 3);
+        this.cCovMuSep = Math.min(1 - cCov1, cCovMu * (dimension + 1.5) / 3);
         this.chiN = Math.sqrt(dimension) * (1 - 1 / (4.0 * dimension) + 1 / (21.0 * dimension * dimension));
 
         // initialize matrices and vectors that change
-        diagD = columnOfOnes(dimension).scalarMultiply(1 / sigma);
-        diagC = square(diagD);
-        pc = zeros(dimension, 1);
-        ps = zeros(dimension, 1);
+        D = new double[dimension];
+        C = new double[dimension];
+        pc = new double[dimension];
+        ps = new double[dimension];
 
-        int historySize = 10 + (int) (3 * 10 * dimension / (double) populationSize);
+        Arrays.fill(D, 1 / sigma);
+        Arrays.fill(C, 1 / sigma / sigma);
+
+        int historySize = 10 + (int) (30.0 * dimension / populationSize);
         this.fitnessHistory = new FitnessHistory(historySize);
     }
 
     public PointValuePair optimize() {
-        double[] guess = generateNormalizedRandomVector();
+        // Number of iterations done so far.
+
+        final double[] xMean = generateNormalizedRandomVector();
         double bestValue;
         {
-            double[] fixedGuess = repair(guess);
+            double[] fixedGuess = repair(xMean);
+            double[][] wrappedGuess = { fixedGuess };
             double[] fitnessHolder = new double[1];
-            function.accept(new double[][] {fixedGuess}, fitnessHolder);
-            bestValue = fitnessHolder[0] + penalty(guess, fixedGuess);
+            function.accept(wrappedGuess, fitnessHolder);
+            bestValue = fitnessHolder[0] + penalty(xMean, fixedGuess);
         }
-        // Vectors and matrices.
-        RealMatrix xMean = MatrixUtils.createColumnRealMatrix(guess);
         fitnessHistory.push(bestValue);
-        PointValuePair optimum = new PointValuePair(guess, bestValue);
+        PointValuePair optimum = new PointValuePair(xMean.clone(), bestValue);
 
         // -------------------- Generation Loop --------------------------------
 
-        for (int iterations = 1; iterations <= maxIterations; ++iterations) {
-            // Generate and evaluate lambda offspring
-            final RealMatrix arz = gaussianMatrix(dimension, populationSize);
-            final RealMatrix arx = zeros(dimension, populationSize);
-            final double[] fitness = new double[populationSize];
-            final double[][] fixedIndividuals = new double[populationSize][];
-            final double[] penalties = new double[populationSize];
+        final Individual[] individuals = new Individual[populationSize];
+        final double[][] exportedGenomes = new double[populationSize][];
+        final double[] importedFitnessValues = new double[populationSize];
+        for (int i = 0; i < populationSize; ++i) {
+            individuals[i] = new Individual(dimension);
+        }
 
-            // generate random offspring
-            for (int k = 0; k < populationSize; k++) {
-                for (int i = 0; i <= nResamplingUntilFeasible; i++) {
-                    arx.setColumnMatrix(k, xMean.add(times(diagD, arz.getColumnMatrix(k)).scalarMultiply(sigma)));
-                    if (i >= nResamplingUntilFeasible || isFeasible(arx.getColumn(k))) {
+        for (int iterations = 1; iterations <= maxIterations; iterations++) {
+            for (int i = 0; i < populationSize; ++i) {
+                Individual ind = individuals[i];
+                for (int t = 0; t <= nResamplingUntilFeasible; ++t) {
+                    ind.initZ(random);
+                    ind.populateX(xMean, D, sigma);
+                    if (ind.isFeasible()) {
                         break;
                     }
-                    // regenerate random arguments for row
-                    arz.setColumn(k, gaussianArray(dimension));
                 }
-                double[] rawIndividual = arx.getColumn(k);
-                fixedIndividuals[k] = repair(rawIndividual);
-                penalties[k] = penalty(rawIndividual, fixedIndividuals[k]);
+                exportedGenomes[i] = ind.fixedX;
             }
-
-            double[] rawFitness = new double[populationSize];
-            function.accept(fixedIndividuals, rawFitness);
-            double valueRange = max(rawFitness) - min(rawFitness);
+            function.accept(exportedGenomes, importedFitnessValues);
+            double valueRange = max(importedFitnessValues) - min(importedFitnessValues);
             for (int i = 0; i < populationSize; ++i) {
-                fitness[i] = rawFitness[i] + penalties[i] * valueRange;
+                individuals[i].setRawFitness(importedFitnessValues[i], valueRange);
             }
 
-            // Sort by fitness and compute weighted mean into xMean
-            final int[] arindex = sortedIndices(fitness);
-            // Calculate new xMean, this is selection and recombination
-            final RealMatrix xOld = xMean; // for speed up of Eq. (2) and (3)
-            final RealMatrix bestArx = selectColumns(arx, MathArrays.copyOf(arindex, mu));
-            xMean = bestArx.multiply(weights);
-            final RealMatrix bestArz = selectColumns(arz, MathArrays.copyOf(arindex, mu));
-            final RealMatrix zMean = bestArz.multiply(weights);
+            Arrays.sort(individuals);
 
-            double q1 = Math.sqrt(cs * (2 - cs) * mueff);
-            ps = ps.scalarMultiply(1 - cs).add(zMean.scalarMultiply(q1));
-            double normPS = ps.getFrobeniusNorm();
+            double q1 = Math.sqrt(cs * (2 - cs) * muEff);
+            double normPS = 0;
+            for (int i = 0; i < dimension; ++i) {
+                double zMeanI = 0;
+                for (int j = 0; j < mu; ++j) {
+                    zMeanI += weights[j] * individuals[j].z[i];
+                }
+                ps[i] = ps[i] * (1 - cs) + zMeanI * q1;
+                normPS += ps[i] * ps[i];
+            }
+            normPS = Math.sqrt(normPS);
+
             boolean hSig = normPS / Math.sqrt(1 - Math.pow(1 - cs, 2 * iterations)) / chiN < 1.4 + 2 / (dimension + 1.0);
-            double q2 = hSig ? Math.sqrt(cc * (2 - cc) * mueff) / sigma : 0;
-            pc = pc.scalarMultiply(1 - cc).add(xMean.subtract(xOld).scalarMultiply(q2));
-            double oldFac = (1 - ccov1Sep - ccovmuSep) + (hSig ? 0 : ccov1Sep * cc * (2 - cc));
-            diagC = diagC.scalarMultiply(oldFac) // regard old matrix
-                    .add(square(pc).scalarMultiply(ccov1Sep)) // plus rank one update
-                    .add((times(diagC, square(bestArz).multiply(weights))) // plus rank mu update
-                            .scalarMultiply(ccovmuSep));
-            diagD = sqrt(diagC); // replaces eig(C)
+            double q2 = hSig ? Math.sqrt(cc * (2 - cc) * muEff) / sigma : 0;
+            double oldFac = (1 - cCov1Sep - cCovMuSep) + (hSig ? 0 : cCov1Sep * cc * (2 - cc));
+
+            for (int i = 0; i < dimension; ++i) {
+                double xOldI = xMean[i];
+                xMean[i] = 0;
+                double weighedSquare = 0;
+                for (int j = 0; j < mu; ++j) {
+                    double xi = individuals[j].x[i];
+                    double zi = individuals[j].z[i];
+                    double wj = weights[j];
+                    xMean[i] += wj * xi;
+                    weighedSquare += wj * zi * zi;
+                }
+                pc[i] = pc[i] * (1 - cc) + q2 * (xMean[i] - xOldI);
+                C[i] = C[i] * oldFac + pc[i] * pc[i] * cCov1Sep + C[i] * weighedSquare * cCovMuSep;
+                D[i] = Math.sqrt(C[i]);
+            }
+
             // Adapt step size sigma - Eq. (5)
-            sigma *= Math.exp(Math.min(1, (normPS/chiN - 1) * cs / damps));
-            final double bestFitness = fitness[arindex[0]];
-            final double worstFitness = fitness[arindex[arindex.length - 1]];
+            sigma *= Math.exp(Math.min(1, (normPS / chiN - 1) * cs / damps));
+            final double bestFitness = individuals[0].fitness;
+            final double worstFitness = individuals[populationSize - 1].fitness;
             if (bestValue > bestFitness) {
                 bestValue = bestFitness;
-                optimum = new PointValuePair(repair(bestArx.getColumn(0)), bestFitness);
+                optimum = new PointValuePair(individuals[0].fixedX.clone(), bestFitness);
             }
             // handle termination criteria
-            if (shallExitBySigmaTolerance(pc.getColumn(0), diagD.getColumn(0))) {
+            if (shallExitBySigmaTolerance()) {
                 break;
             }
             final double historyBest = fitnessHistory.getMinimum();
@@ -199,11 +214,11 @@ public class CMAESDistributionOptimizer {
                 break;
             }
             // condition number of the covariance matrix exceeds 1e14
-            if (max(diagD) / min(diagD) > 1e7) {
+            if (max(D) / min(D) > 1e7) {
                 break;
             }
             // Adjust step size in case of equal function values (flat fitness)
-            if (bestValue == fitness[arindex[(int) (0.1 + populationSize / 4.0)]]) {
+            if (bestValue == individuals[(int) (0.1 + populationSize / 4.0)].fitness) {
                 sigma *= Math.exp(0.2 + cs / damps);
             }
             if (iterations > 2 && Math.max(historyWorst, bestFitness) - Math.min(historyBest, bestFitness) == 0) {
@@ -215,14 +230,53 @@ public class CMAESDistributionOptimizer {
         return optimum;
     }
 
-    private boolean shallExitBySigmaTolerance(double[] pcCol, double[] diagD) {
+    private static class Individual implements Comparable<Individual> {
+        private final double[] x, fixedX, z;
+        private double fitness, penalty;
+
+        Individual(int dimension) {
+            x = new double[dimension];
+            fixedX = new double[dimension];
+            z = new double[dimension];
+        }
+
+        void initZ(RandomGenerator generator) {
+            for (int i = 0; i < z.length; ++i) {
+                z[i] = generator.nextGaussian();
+            }
+        }
+
+        void populateX(double[] xMean, double[] diagD, double sigma) {
+            penalty = 0;
+            for (int i = 0; i < x.length; ++i) {
+                x[i] = xMean[i] + diagD[i] * z[i] * sigma;
+                fixedX[i] = Math.min(1, Math.max(0, x[i]));
+                penalty += Math.abs(x[i] - fixedX[i]);
+            }
+        }
+
+        void setRawFitness(double rawFitness, double penaltyScale) {
+            this.fitness = rawFitness + penalty * penaltyScale;
+        }
+
+        boolean isFeasible() {
+            return penalty == 0;
+        }
+
+        @Override
+        public int compareTo(Individual o) {
+            return Double.compare(fitness, o.fitness);
+        }
+    }
+
+    private boolean shallExitBySigmaTolerance() {
         for (int i = 0; i < dimension; i++) {
-            if (sigma * diagD[i] > stopTolUpX) {
+            if (sigma * D[i] > stopTolUpX) {
                 return true;
             }
         }
         for (int i = 0; i < dimension; i++) {
-            if (sigma * Math.max(Math.abs(pcCol[i]), diagD[i]) > stopTolX) {
+            if (sigma * Math.max(Math.abs(pc[i]), D[i]) > stopTolX) {
                 return false;
             }
         }
@@ -240,42 +294,6 @@ public class CMAESDistributionOptimizer {
             guess[i] /= guessSum;
         }
         return guess;
-    }
-
-    private static int[] sortedIndices(final double[] doubles) {
-        final DoubleIndex[] dis = new DoubleIndex[doubles.length];
-        for (int i = 0; i < doubles.length; i++) {
-            dis[i] = new DoubleIndex(doubles[i], i);
-        }
-        Arrays.sort(dis);
-        final int[] indices = new int[doubles.length];
-        for (int i = 0; i < doubles.length; i++) {
-            indices[i] = dis[i].index;
-        }
-        return indices;
-    }
-
-    private static class DoubleIndex implements Comparable<DoubleIndex> {
-        private final double value;
-        private final int index;
-
-        DoubleIndex(double value, int index) {
-            this.value = value;
-            this.index = index;
-        }
-
-        public int compareTo(DoubleIndex o) {
-            return Double.compare(value, o.value);
-        }
-    }
-
-    private static boolean isFeasible(final double[] x) {
-        for (double v : x) {
-            if (v < 0 || v > 1) {
-                return false;
-            }
-        }
-        return true;
     }
 
     private static double[] repair(final double[] x) {
@@ -352,105 +370,6 @@ public class CMAESDistributionOptimizer {
 
     // -----Matrix utility functions similar to the Matlab build in functions------
 
-    private static RealMatrix log(final RealMatrix m) {
-        final double[][] d = new double[m.getRowDimension()][m.getColumnDimension()];
-        for (int r = 0; r < m.getRowDimension(); r++) {
-            for (int c = 0; c < m.getColumnDimension(); c++) {
-                d[r][c] = Math.log(m.getEntry(r, c));
-            }
-        }
-        return new Array2DRowRealMatrix(d, false);
-    }
-
-    private static RealMatrix sqrt(final RealMatrix m) {
-        final double[][] d = new double[m.getRowDimension()][m.getColumnDimension()];
-        for (int r = 0; r < m.getRowDimension(); r++) {
-            for (int c = 0; c < m.getColumnDimension(); c++) {
-                d[r][c] = Math.sqrt(m.getEntry(r, c));
-            }
-        }
-        return new Array2DRowRealMatrix(d, false);
-    }
-
-    private static RealMatrix square(final RealMatrix m) {
-        final double[][] d = new double[m.getRowDimension()][m.getColumnDimension()];
-        for (int r = 0; r < m.getRowDimension(); r++) {
-            for (int c = 0; c < m.getColumnDimension(); c++) {
-                double e = m.getEntry(r, c);
-                d[r][c] = e * e;
-            }
-        }
-        return new Array2DRowRealMatrix(d, false);
-    }
-
-    private static RealMatrix times(final RealMatrix m, final RealMatrix n) {
-        final double[][] d = new double[m.getRowDimension()][m.getColumnDimension()];
-        for (int r = 0; r < m.getRowDimension(); r++) {
-            for (int c = 0; c < m.getColumnDimension(); c++) {
-                d[r][c] = m.getEntry(r, c) * n.getEntry(r, c);
-            }
-        }
-        return new Array2DRowRealMatrix(d, false);
-    }
-
-    private static RealMatrix selectColumns(final RealMatrix m, final int[] cols) {
-        final double[][] d = new double[m.getRowDimension()][cols.length];
-        for (int r = 0; r < m.getRowDimension(); r++) {
-            for (int c = 0; c < cols.length; c++) {
-                d[r][c] = m.getEntry(r, cols[c]);
-            }
-        }
-        return new Array2DRowRealMatrix(d, false);
-    }
-
-    private static RealMatrix columnOfOnes(int n) {
-        final double[][] d = new double[n][1];
-        for (int r = 0; r < n; r++) {
-            Arrays.fill(d[r], 1);
-        }
-        return new Array2DRowRealMatrix(d, false);
-    }
-
-    private static RealMatrix zeros(int n, int m) {
-        return new Array2DRowRealMatrix(n, m);
-    }
-
-    private static RealMatrix naturals(int size) {
-        final double[][] d = new double[size][1];
-        double value = 1;
-        for (int r = 0; r < size; r++) {
-            d[r][0] = value;
-            value += 1;
-        }
-        return new Array2DRowRealMatrix(d, false);
-    }
-
-    private static double max(final RealMatrix m) {
-        double max = -Double.MAX_VALUE;
-        for (int r = 0; r < m.getRowDimension(); r++) {
-            for (int c = 0; c < m.getColumnDimension(); c++) {
-                double e = m.getEntry(r, c);
-                if (max < e) {
-                    max = e;
-                }
-            }
-        }
-        return max;
-    }
-
-    private static double min(final RealMatrix m) {
-        double min = Double.MAX_VALUE;
-        for (int r = 0; r < m.getRowDimension(); r++) {
-            for (int c = 0; c < m.getColumnDimension(); c++) {
-                double e = m.getEntry(r, c);
-                if (min > e) {
-                    min = e;
-                }
-            }
-        }
-        return min;
-    }
-
     private static double max(final double[] m) {
         double max = Double.MIN_VALUE;
         for (double v : m) {
@@ -469,23 +388,5 @@ public class CMAESDistributionOptimizer {
             }
         }
         return min;
-    }
-
-    private double[] gaussianArray(int size) {
-        final double[] result = new double[size];
-        for (int i = 0; i < size; i++) {
-            result[i] = random.nextGaussian();
-        }
-        return result;
-    }
-
-    private RealMatrix gaussianMatrix(int size, int popSize) {
-        final double[][] d = new double[size][popSize];
-        for (int r = 0; r < size; r++) {
-            for (int c = 0; c < popSize; c++) {
-                d[r][c] = random.nextGaussian();
-            }
-        }
-        return new Array2DRowRealMatrix(d, false);
     }
 }
