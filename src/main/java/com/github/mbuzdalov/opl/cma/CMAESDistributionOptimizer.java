@@ -10,21 +10,7 @@ import org.apache.commons.math3.random.RandomGenerator;
  * and refactored to suit the needs of this project.
  */
 public class CMAESDistributionOptimizer {
-    // Main user input parameters.
-    private final int dimension;
-
-    // Internal termination criteria.
-    private final double stopTolUpX;
-    private final double stopTolX;
-
-    // Varying auto-inferred parameters.
-    private double sigma;
-
-    // Vectors and matrices.
-    private final double[] pc;
-    private final double[] D;
-
-    // Results
+    // Variables to store the results.
     private double[] bestRunIndividual;
     private double bestRunFitness;
 
@@ -38,18 +24,16 @@ public class CMAESDistributionOptimizer {
             throw new IllegalArgumentException("Population size must be positive, found " + populationSize);
         }
 
-        this.dimension = dimension;
+        // Initialize the common step size.
+        double sigma = 1;
 
-        this.sigma = 1;
-
-        // initialize termination criteria
-        this.stopTolUpX = 1e3;
-        this.stopTolX = 1e-11;
+        // Initialize constants for internal termination criteria.
+        double stopTolUpX = 1e3;
+        double stopTolX = 1e-11;
         double stopTolFun = 1e-12;
         double stopTolHistFun = 1e-13;
 
-        // initialize selection strategy parameters
-        // Fixed auto-inferred parameters.
+        // Initialize weights.
         int mu = populationSize / 2;
         double[] weights = new double[mu];
         double sumW = 0;
@@ -65,9 +49,10 @@ public class CMAESDistributionOptimizer {
         }
         double muEff = sumW * sumW / sumWQ;
 
-        // initialize parameters and constants
+        // Initialize pre-tuned parameters and constants.
         double cc = (4 + muEff / dimension) / (dimension + 4 + 2 * muEff / dimension);
         double cs = (muEff + 2) / (dimension + muEff + 3);
+        double qCS = Math.sqrt(cs * (2 - cs) * muEff);
         double damps = (1 + 2 * Math.max(0, Math.sqrt((muEff - 1) / (dimension + 1)) - 1)) *
                 Math.max(0.3, 1 - dimension / (1e-6 + maxIterations)) + cs;
         double cCov1 = 2 / ((dimension + 1.3) * (dimension + 1.3) + muEff);
@@ -76,18 +61,19 @@ public class CMAESDistributionOptimizer {
         double cCovMuSep = Math.min(1 - cCov1, cCovMu * (dimension + 1.5) / 3);
         double chiN = Math.sqrt(dimension) * (1 - 1 / (4.0 * dimension) + 1 / (21.0 * dimension * dimension));
 
-        // initialize matrices and vectors that change
-        D = new double[dimension];
+        // Initialize matrices and step sizes.
+        double[] D = new double[dimension];
         double[] C = new double[dimension];
-        pc = new double[dimension];
+        double[] pc = new double[dimension];
         double[] ps = new double[dimension];
-
         Arrays.fill(D, 1 / sigma);
         Arrays.fill(C, 1 / sigma / sigma);
 
+        // Initialize fitness history to track stagnation.
         int historySize = 10 + (int) (30.0 * dimension / populationSize);
         FitnessHistory fitnessHistory = new FitnessHistory(historySize);
 
+        // Create and evaluate the initial guess.
         double[] xMean = new double[dimension];
         {
             double sum = 0;
@@ -106,6 +92,7 @@ public class CMAESDistributionOptimizer {
         }
         fitnessHistory.push(bestRunFitness);
 
+        // Allocate all the memory for individuals and auxiliary fitness in/out arrays.
         final Individual[] individuals = new Individual[populationSize];
         final double[][] exportedGenomes = new double[populationSize][];
         final double[] importedFitnessValues = new double[populationSize];
@@ -113,42 +100,47 @@ public class CMAESDistributionOptimizer {
             individuals[i] = new Individual(dimension);
         }
 
+        // Do the iterations.
         for (int iterations = 1; iterations <= maxIterations; iterations++) {
+            // Initialize the current population.
             for (int i = 0; i < populationSize; ++i) {
                 Individual ind = individuals[i];
                 for (int t = 0; t <= nResamplingUntilFeasible; ++t) {
-                    ind.initZ(random);
-                    ind.populateX(xMean, D, sigma);
+                    ind.initialize(random, xMean, D, sigma);
                     if (ind.isFeasible()) {
                         break;
                     }
                 }
                 exportedGenomes[i] = ind.fixedX;
             }
+            // Run the fitness evaluation on all the fixed individuals.
             function.accept(exportedGenomes, importedFitnessValues);
+            // Assign violation-discounted fitness to the individuals.
             double valueRange = max(importedFitnessValues) - min(importedFitnessValues);
             for (int i = 0; i < populationSize; ++i) {
                 individuals[i].setRawFitness(importedFitnessValues[i], valueRange);
             }
-
+            // Sort the individuals. Better ones come first.
             Arrays.sort(individuals);
 
-            double q1 = Math.sqrt(cs * (2 - cs) * muEff);
+            // Update the before-the-matrix step size (commonly known as ps).
             double normPS = 0;
             for (int i = 0; i < dimension; ++i) {
                 double zMeanI = 0;
                 for (int j = 0; j < mu; ++j) {
                     zMeanI += weights[j] * individuals[j].z[i];
                 }
-                ps[i] = ps[i] * (1 - cs) + zMeanI * q1;
+                ps[i] = ps[i] * (1 - cs) + zMeanI * qCS;
                 normPS += ps[i] * ps[i];
             }
             normPS = Math.sqrt(normPS);
 
+            // Compute normalization coefficients for the rest of the updates.
             boolean hSig = normPS / Math.sqrt(1 - Math.pow(1 - cs, 2 * iterations)) / chiN < 1.4 + 2 / (dimension + 1.0);
             double q2 = hSig ? Math.sqrt(cc * (2 - cc) * muEff) / sigma : 0;
             double oldFac = (1 - cCov1Sep - cCovMuSep) + (hSig ? 0 : cCov1Sep * cc * (2 - cc));
 
+            // Do all the updates in a single run to avoid storage of temporary variables.
             for (int i = 0; i < dimension; ++i) {
                 double xOldI = xMean[i];
                 xMean[i] = 0;
@@ -165,38 +157,64 @@ public class CMAESDistributionOptimizer {
                 D[i] = Math.sqrt(C[i]);
             }
 
-            // Adapt step size sigma - Eq. (5)
+            // Adapt the common step size.
             sigma *= Math.exp(Math.min(1, (normPS / chiN - 1) * cs / damps));
+
+            // Update the best individual, and also check up the worst fitness across the iteration.
             final double bestFitness = individuals[0].fitness;
             final double worstFitness = individuals[populationSize - 1].fitness;
             if (bestRunFitness > bestFitness) {
                 bestRunFitness = bestFitness;
                 bestRunIndividual = individuals[0].fixedX.clone();
             }
-            // handle termination criteria
-            if (shallExitBySigmaTolerance()) {
-                break;
+
+            // Check termination degeneration-based criterion 1.
+            for (int i = 0; i < dimension; i++) {
+                if (sigma * D[i] > stopTolUpX) {
+                    return;
+                }
             }
+
+            // Check termination degeneration-based criterion 2.
+            boolean validated = false;
+            for (int i = 0; i < dimension; i++) {
+                if (sigma * Math.max(Math.abs(pc[i]), D[i]) > stopTolX) {
+                    validated = true;
+                    break;
+                }
+            }
+            if (!validated) {
+                return;
+            }
+
+            // Check whether the condition number is too high (1e14) to continue.
+            if (max(D) / min(D) > 1e7) {
+                return;
+            }
+
+            // Check termination stagnation-based criterion 1.
             final double historyBest = fitnessHistory.getMinimum();
             final double historyWorst = fitnessHistory.getMaximum();
             if (iterations > 2 && Math.max(historyWorst, worstFitness) - Math.min(historyBest, bestFitness) < stopTolFun) {
-                break;
+                return;
             }
+
+            // Check termination stagnation-based criterion 2.
             if (iterations > fitnessHistory.getCapacity() && historyWorst - historyBest < stopTolHistFun) {
-                break;
+                return;
             }
-            // condition number of the covariance matrix exceeds 1e14
-            if (max(D) / min(D) > 1e7) {
-                break;
-            }
-            // Adjust step size in case of equal function values (flat fitness)
+
+            // Adjust step size in the case of equal function values, the case of plain population.
             if (bestRunFitness == individuals[(int) (0.1 + populationSize / 4.0)].fitness) {
                 sigma *= Math.exp(0.2 + cs / damps);
             }
+
+            // Adjust step size in the case of equal fitness values, the case of plain history.
             if (iterations > 2 && Math.max(historyWorst, bestFitness) - Math.min(historyBest, bestFitness) == 0) {
                 sigma *= Math.exp(0.2 + cs / damps);
             }
-            // store best in history
+
+            // Update the fitness history.
             fitnessHistory.push(bestFitness);
         }
     }
@@ -219,15 +237,10 @@ public class CMAESDistributionOptimizer {
             z = new double[dimension];
         }
 
-        void initZ(RandomGenerator generator) {
+        void initialize(RandomGenerator generator, double[] xMean, double[] diagD, double sigma) {
+            penalty = 0;
             for (int i = 0; i < z.length; ++i) {
                 z[i] = generator.nextGaussian();
-            }
-        }
-
-        void populateX(double[] xMean, double[] diagD, double sigma) {
-            penalty = 0;
-            for (int i = 0; i < x.length; ++i) {
                 x[i] = xMean[i] + diagD[i] * z[i] * sigma;
                 fixedX[i] = Math.min(1, Math.max(0, x[i]));
                 penalty += Math.abs(x[i] - fixedX[i]);
@@ -246,20 +259,6 @@ public class CMAESDistributionOptimizer {
         public int compareTo(Individual o) {
             return Double.compare(fitness, o.fitness);
         }
-    }
-
-    private boolean shallExitBySigmaTolerance() {
-        for (int i = 0; i < dimension; i++) {
-            if (sigma * D[i] > stopTolUpX) {
-                return true;
-            }
-        }
-        for (int i = 0; i < dimension; i++) {
-            if (sigma * Math.max(Math.abs(pc[i]), D[i]) > stopTolX) {
-                return false;
-            }
-        }
-        return true;
     }
 
     private static class FitnessHistory {
@@ -312,8 +311,6 @@ public class CMAESDistributionOptimizer {
             return nOutputs == 0 ? inputMax : Math.max(inputMax, outputMax[nOutputs - 1]);
         }
     }
-
-    // -----Matrix utility functions similar to the Matlab build in functions------
 
     private static double max(final double[] m) {
         double max = Double.MIN_VALUE;
