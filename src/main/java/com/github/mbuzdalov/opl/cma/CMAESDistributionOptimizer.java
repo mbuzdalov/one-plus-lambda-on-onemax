@@ -118,16 +118,21 @@ public class CMAESDistributionOptimizer {
     }
 
     public PointValuePair optimize() {
-        // Number of iterations done so far.
-
-        final double[] xMean = generateNormalizedRandomVector();
+        final double[] xMean = new double[dimension];
         double bestValue;
         {
-            double[] fixedGuess = repair(xMean);
-            double[][] wrappedGuess = { fixedGuess };
+            double sum = 0;
+            for (int i = 0; i < dimension; ++i) {
+                xMean[i] = random.nextDouble();
+                sum += xMean[i];
+            }
+            for (int i = 0; i < dimension; ++i) {
+                xMean[i] /= sum;
+            }
+            double[][] wrappedGuess = { xMean };
             double[] fitnessHolder = new double[1];
             function.accept(wrappedGuess, fitnessHolder);
-            bestValue = fitnessHolder[0] + penalty(xMean, fixedGuess);
+            bestValue = fitnessHolder[0];
         }
         fitnessHistory.push(bestValue);
         PointValuePair optimum = new PointValuePair(xMean.clone(), bestValue);
@@ -281,40 +286,6 @@ public class CMAESDistributionOptimizer {
             }
         }
         return true;
-    }
-
-    private double[] generateNormalizedRandomVector() {
-        final double[] guess = new double[dimension];
-        double guessSum = 0;
-        for (int i = 0; i < dimension; ++i) {
-            guess[i] = random.nextDouble();
-            guessSum += guess[i];
-        }
-        for (int i = 0; i < dimension; ++i) {
-            guess[i] /= guessSum;
-        }
-        return guess;
-    }
-
-    private static double[] repair(final double[] x) {
-        final double[] repaired = x.clone();
-        for (int i = 0; i < repaired.length; i++) {
-            if (repaired[i] < 0) {
-                repaired[i] = 0;
-            } else if (repaired[i] > 1) {
-                repaired[i] = 1;
-            }
-        }
-        return repaired;
-    }
-
-    private static double penalty(final double[] x, final double[] repaired) {
-        double penalty = 0;
-        for (int i = 0; i < x.length; i++) {
-            double diff = Math.abs(x[i] - repaired[i]);
-            penalty += diff;
-        }
-        return penalty;
     }
 
     private static class FitnessHistory {
