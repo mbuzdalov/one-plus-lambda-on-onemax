@@ -3,7 +3,6 @@ package com.github.mbuzdalov.opl.cma;
 import java.util.Arrays;
 import java.util.function.BiConsumer;
 
-import org.apache.commons.math3.optim.PointValuePair;
 import org.apache.commons.math3.random.RandomGenerator;
 
 /**
@@ -12,45 +11,22 @@ import org.apache.commons.math3.random.RandomGenerator;
  */
 public class CMAESDistributionOptimizer {
     // Main user input parameters.
-    private final int populationSize;
     private final int dimension;
-    private final BiConsumer<double[][], double[]> function;
-
-    // Other configuration parameters.
-    private final int nResamplingUntilFeasible;
-    private final int maxIterations;
 
     // Internal termination criteria.
     private final double stopTolUpX;
     private final double stopTolX;
-    private final double stopTolFun;
-    private final double stopTolHistFun;
-
-    // Fixed auto-inferred parameters.
-    private final int mu;
-    private final double[] weights;
-    private final double muEff;
-    private final double cc;
-    private final double cs;
-    private final double damps;
-    private final double chiN;
-    private final double cCov1Sep;
-    private final double cCovMuSep;
 
     // Varying auto-inferred parameters.
     private double sigma;
 
     // Vectors and matrices.
     private final double[] pc;
-    private final double[] ps;
     private final double[] D;
-    private final double[] C;
 
-    /** History queue of best values. */
-    private final FitnessHistory fitnessHistory;
-
-    /** Random generator. */
-    private final RandomGenerator random;
+    // Results
+    private double[] bestRunIndividual;
+    private double bestRunFitness;
 
     public CMAESDistributionOptimizer(int maxIterations,
                                        int nResamplingUntilFeasible,
@@ -62,24 +38,20 @@ public class CMAESDistributionOptimizer {
             throw new IllegalArgumentException("Population size must be positive, found " + populationSize);
         }
 
-        this.maxIterations = maxIterations;
-        this.nResamplingUntilFeasible = nResamplingUntilFeasible;
-        this.random = random;
         this.dimension = dimension;
-        this.populationSize = populationSize;
-        this.function = function;
 
         this.sigma = 1;
 
         // initialize termination criteria
         this.stopTolUpX = 1e3;
         this.stopTolX = 1e-11;
-        this.stopTolFun = 1e-12;
-        this.stopTolHistFun = 1e-13;
+        double stopTolFun = 1e-12;
+        double stopTolHistFun = 1e-13;
 
         // initialize selection strategy parameters
-        this.mu = populationSize / 2;
-        this.weights = new double[mu];
+        // Fixed auto-inferred parameters.
+        int mu = populationSize / 2;
+        double[] weights = new double[mu];
         double sumW = 0;
         double sumWQ = 0;
         for (int i = 0; i < mu; ++i) {
@@ -91,35 +63,32 @@ public class CMAESDistributionOptimizer {
         for (int i = 0; i < mu; ++i) {
             weights[i] /= sumW;
         }
-        this.muEff = sumW * sumW / sumWQ;
+        double muEff = sumW * sumW / sumWQ;
 
         // initialize parameters and constants
-        this.cc = (4 + muEff / dimension) / (dimension + 4 + 2 * muEff / dimension);
-        this.cs = (muEff + 2) / (dimension + muEff + 3);
-        this.damps = (1 + 2 * Math.max(0, Math.sqrt((muEff - 1) / (dimension + 1)) - 1)) *
+        double cc = (4 + muEff / dimension) / (dimension + 4 + 2 * muEff / dimension);
+        double cs = (muEff + 2) / (dimension + muEff + 3);
+        double damps = (1 + 2 * Math.max(0, Math.sqrt((muEff - 1) / (dimension + 1)) - 1)) *
                 Math.max(0.3, 1 - dimension / (1e-6 + maxIterations)) + cs;
         double cCov1 = 2 / ((dimension + 1.3) * (dimension + 1.3) + muEff);
         double cCovMu = Math.min(1 - cCov1, 2 * (muEff - 2 + 1 / muEff) / ((dimension + 2) * (dimension + 2) + muEff));
-        this.cCov1Sep = Math.min(1, cCov1 * (dimension + 1.5) / 3);
-        this.cCovMuSep = Math.min(1 - cCov1, cCovMu * (dimension + 1.5) / 3);
-        this.chiN = Math.sqrt(dimension) * (1 - 1 / (4.0 * dimension) + 1 / (21.0 * dimension * dimension));
+        double cCov1Sep = Math.min(1, cCov1 * (dimension + 1.5) / 3);
+        double cCovMuSep = Math.min(1 - cCov1, cCovMu * (dimension + 1.5) / 3);
+        double chiN = Math.sqrt(dimension) * (1 - 1 / (4.0 * dimension) + 1 / (21.0 * dimension * dimension));
 
         // initialize matrices and vectors that change
         D = new double[dimension];
-        C = new double[dimension];
+        double[] C = new double[dimension];
         pc = new double[dimension];
-        ps = new double[dimension];
+        double[] ps = new double[dimension];
 
         Arrays.fill(D, 1 / sigma);
         Arrays.fill(C, 1 / sigma / sigma);
 
         int historySize = 10 + (int) (30.0 * dimension / populationSize);
-        this.fitnessHistory = new FitnessHistory(historySize);
-    }
+        FitnessHistory fitnessHistory = new FitnessHistory(historySize);
 
-    public PointValuePair optimize() {
-        final double[] xMean = new double[dimension];
-        double bestValue;
+        double[] xMean = new double[dimension];
         {
             double sum = 0;
             for (int i = 0; i < dimension; ++i) {
@@ -132,12 +101,10 @@ public class CMAESDistributionOptimizer {
             double[][] wrappedGuess = { xMean };
             double[] fitnessHolder = new double[1];
             function.accept(wrappedGuess, fitnessHolder);
-            bestValue = fitnessHolder[0];
+            bestRunFitness = fitnessHolder[0];
+            bestRunIndividual = xMean.clone();
         }
-        fitnessHistory.push(bestValue);
-        PointValuePair optimum = new PointValuePair(xMean.clone(), bestValue);
-
-        // -------------------- Generation Loop --------------------------------
+        fitnessHistory.push(bestRunFitness);
 
         final Individual[] individuals = new Individual[populationSize];
         final double[][] exportedGenomes = new double[populationSize][];
@@ -202,9 +169,9 @@ public class CMAESDistributionOptimizer {
             sigma *= Math.exp(Math.min(1, (normPS / chiN - 1) * cs / damps));
             final double bestFitness = individuals[0].fitness;
             final double worstFitness = individuals[populationSize - 1].fitness;
-            if (bestValue > bestFitness) {
-                bestValue = bestFitness;
-                optimum = new PointValuePair(individuals[0].fixedX.clone(), bestFitness);
+            if (bestRunFitness > bestFitness) {
+                bestRunFitness = bestFitness;
+                bestRunIndividual = individuals[0].fixedX.clone();
             }
             // handle termination criteria
             if (shallExitBySigmaTolerance()) {
@@ -223,7 +190,7 @@ public class CMAESDistributionOptimizer {
                 break;
             }
             // Adjust step size in case of equal function values (flat fitness)
-            if (bestValue == individuals[(int) (0.1 + populationSize / 4.0)].fitness) {
+            if (bestRunFitness == individuals[(int) (0.1 + populationSize / 4.0)].fitness) {
                 sigma *= Math.exp(0.2 + cs / damps);
             }
             if (iterations > 2 && Math.max(historyWorst, bestFitness) - Math.min(historyBest, bestFitness) == 0) {
@@ -232,7 +199,14 @@ public class CMAESDistributionOptimizer {
             // store best in history
             fitnessHistory.push(bestFitness);
         }
-        return optimum;
+    }
+
+    public double[] getBestIndividual() {
+        return bestRunIndividual;
+    }
+
+    public double getBestFitness() {
+        return bestRunFitness;
     }
 
     private static class Individual implements Comparable<Individual> {

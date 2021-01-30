@@ -70,13 +70,10 @@ object OptimalStaticDistribution {
 
   def findOptimalDistribution(n: Int, lambda: Int, rng: RandomGenerator): RunResult = {
     val objectiveFunction = new FitnessFunction(lambda)
-
     val optimizer = new CMAESDistributionOptimizer(100 * n * n, 10, rng, n, 10, (i, f) => objectiveFunction.evaluate(i, f))
-    val result = optimizer.optimize()
-
-    val finalDistribution = result.getPoint
+    val finalDistribution = optimizer.getBestIndividual
     normalize(finalDistribution)
-    RunResult(result.getValue, finalDistribution, objectiveFunction.sequence)
+    RunResult(optimizer.getBestFitness, finalDistribution, objectiveFunction.sequence)
   }
 
   private val rng = ThreadLocal.withInitial(() => new MersenneTwister())
