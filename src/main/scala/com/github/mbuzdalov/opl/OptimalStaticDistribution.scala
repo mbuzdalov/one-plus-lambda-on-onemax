@@ -33,12 +33,15 @@ object OptimalStaticDistribution {
     private[this] var lastUpdate = 0
     private[this] val fitnessSequence = IndexedSeq.newBuilder[(Int, Double)]
 
-    def evaluate(distributions: Array[Array[Double]]): Array[Double] = {
+    def evaluate(distributions: Array[Array[Double]], fitness: Array[Double]): Unit = {
       val n = distributions(0).length
       val listeners = distributions.map(d => OptimalRunningTime.newListener(new FixedDistribution(d)))
-      OnePlusLambda(n, lambda, listeners, printTimings = false)
-      val results = listeners.map(_.toResult.expectedRunningTime)
-      for (result <- results) {
+
+      OnePlusLambda(n, lambda, listeners.toIndexedSeq, printTimings = false)
+
+      for (i <- listeners.indices) {
+        val result = listeners(i).toResult.expectedRunningTime
+        fitness(i) = result
         nCalls += 1
         if (bestFitness > result) {
           if (lastUpdate < nCalls - 1)
@@ -49,7 +52,6 @@ object OptimalStaticDistribution {
           fitnessSequence += nCalls -> bestFitness
         }
       }
-      results
     }
 
     def sequence: IndexedSeq[(Int, Double)] = fitnessSequence.result()
@@ -69,7 +71,7 @@ object OptimalStaticDistribution {
   def findOptimalDistribution(n: Int, lambda: Int, rng: RandomGenerator): RunResult = {
     val objectiveFunction = new FitnessFunction(lambda)
 
-    val optimizer = new CMAESDistributionOptimizer(100 * n * n, true, 10, 10, rng, n, 10, a => objectiveFunction.evaluate(a))
+    val optimizer = new CMAESDistributionOptimizer(100 * n * n, 10, rng, n, 10, (i, f) => objectiveFunction.evaluate(i, f))
     val result = optimizer.optimize()
 
     val finalDistribution = result.getPoint
