@@ -3,7 +3,7 @@ package com.github.mbuzdalov.opl.cma;
 import java.util.Arrays;
 import java.util.function.BiConsumer;
 
-import org.apache.commons.math3.random.RandomGenerator;
+import com.github.mbuzdalov.opl.util.FastRandom;
 
 /**
  * This class implements a separable CMA-ES optimizer derived from the Apache Math version
@@ -16,7 +16,6 @@ public class CMAESDistributionOptimizer {
 
     public CMAESDistributionOptimizer(int maxIterations,
                                        int nResamplingUntilFeasible,
-                                       RandomGenerator random,
                                        int dimension,
                                        int populationSize,
                                        BiConsumer<double[][], double[]> function) {
@@ -72,6 +71,9 @@ public class CMAESDistributionOptimizer {
         // Initialize fitness history to track stagnation.
         int historySize = 10 + (int) (30.0 * dimension / populationSize);
         FitnessHistory fitnessHistory = new FitnessHistory(historySize);
+
+        // Fetch the thread-local random number generator.
+        FastRandom random = FastRandom.threadLocal();
 
         // Create and evaluate the initial guess.
         double[] xMean = new double[dimension];
@@ -237,10 +239,10 @@ public class CMAESDistributionOptimizer {
             z = new double[dimension];
         }
 
-        void initialize(RandomGenerator generator, double[] xMean, double[] diagD, double sigma) {
+        void initialize(FastRandom rng, double[] xMean, double[] diagD, double sigma) {
             penalty = 0;
             for (int i = 0; i < z.length; ++i) {
-                z[i] = generator.nextGaussian();
+                z[i] = rng.nextGaussian();
                 x[i] = xMean[i] + diagD[i] * z[i] * sigma;
                 fixedX[i] = Math.min(1, Math.max(0, x[i]));
                 penalty += Math.abs(x[i] - fixedX[i]);

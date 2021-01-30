@@ -5,8 +5,6 @@ import java.util.concurrent.{Callable, Executors}
 
 import scala.util.Using
 
-import org.apache.commons.math3.random.{MersenneTwister, RandomGenerator}
-
 import com.github.mbuzdalov.opl.cma.CMAESDistributionOptimizer
 import com.github.mbuzdalov.opl.computation.OptimalRunningTime
 import com.github.mbuzdalov.opl.distribution.ParameterizedDistribution
@@ -68,19 +66,18 @@ object OptimalStaticDistribution {
 
   case class RunResult(fitness: Double, distribution: Array[Double], history: IndexedSeq[(Int, Double)])
 
-  def findOptimalDistribution(n: Int, lambda: Int, rng: RandomGenerator): RunResult = {
+  def findOptimalDistribution(n: Int, lambda: Int): RunResult = {
     val objectiveFunction = new FitnessFunction(lambda)
-    val optimizer = new CMAESDistributionOptimizer(100 * n * n, 10, rng, n, 10, (i, f) => objectiveFunction.evaluate(i, f))
+    val optimizer = new CMAESDistributionOptimizer(100 * n * n, 10, n, 10, (i, f) => objectiveFunction.evaluate(i, f))
     val finalDistribution = optimizer.getBestIndividual
     normalize(finalDistribution)
     RunResult(optimizer.getBestFitness, finalDistribution, objectiveFunction.sequence)
   }
 
-  private val rng = ThreadLocal.withInitial(() => new MersenneTwister())
   private class Task(n: Int, lambda: Int) extends Callable[RunResult] {
     override def call(): RunResult = {
       val start = System.nanoTime()
-      val result = findOptimalDistribution(n, lambda, rng.get())
+      val result = findOptimalDistribution(n, lambda)
       val time = System.nanoTime() - start
       println(s"  Fitness: ${result.fitness} in ${time * 1e-9} seconds")
       result
