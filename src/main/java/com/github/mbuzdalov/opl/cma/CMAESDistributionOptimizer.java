@@ -107,12 +107,7 @@ public final class CMAESDistributionOptimizer {
             // Initialize the current population.
             for (int i = 0; i < populationSize; ++i) {
                 Individual ind = individuals[i];
-                for (int t = 0; t <= nResamplingUntilFeasible; ++t) {
-                    ind.initialize(random, xMean, D, sigma);
-                    if (ind.isFeasible()) {
-                        break;
-                    }
-                }
+                ind.initialize(random, xMean, D, sigma, nResamplingUntilFeasible);
                 exportedGenomes[i] = ind.getFixedX();
             }
             // Run the fitness evaluation on all the fixed individuals.

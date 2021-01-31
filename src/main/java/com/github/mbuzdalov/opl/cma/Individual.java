@@ -6,20 +6,22 @@ public final class Individual implements Comparable<Individual> {
     private final double[] x, fixedX, z;
     private double fitness, penalty;
 
-    Individual(int dimension) {
+    public Individual(int dimension) {
         x = new double[dimension];
         fixedX = new double[dimension];
         z = new double[dimension];
     }
 
-    public void initialize(FastRandom rng, double[] xMean, double[] diagD, double sigma) {
-        penalty = 0;
-        for (int i = 0; i < z.length; ++i) {
-            z[i] = rng.nextGaussian();
-            x[i] = xMean[i] + diagD[i] * z[i] * sigma;
-            fixedX[i] = Math.min(1, Math.max(0, x[i]));
-            penalty += Math.abs(x[i] - fixedX[i]);
-        }
+    public void initialize(FastRandom rng, double[] xMean, double[] D, double sigma, int resampleWhileFeasible) {
+        do {
+            penalty = 0;
+            for (int i = 0; i < z.length; ++i) {
+                z[i] = rng.nextGaussian();
+                x[i] = xMean[i] + D[i] * z[i] * sigma;
+                fixedX[i] = Math.min(1, Math.max(0, x[i]));
+                penalty += Math.abs(x[i] - fixedX[i]);
+            }
+        } while (penalty != 0 && --resampleWhileFeasible >= 0);
     }
 
     public double[] getFixedX() {
