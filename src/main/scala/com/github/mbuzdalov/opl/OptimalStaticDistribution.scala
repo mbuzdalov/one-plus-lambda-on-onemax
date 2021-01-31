@@ -5,9 +5,9 @@ import java.util.concurrent.{Callable, Executors}
 
 import scala.util.Using
 
-import com.github.mbuzdalov.opl.cma.CMAESDistributionOptimizer
 import com.github.mbuzdalov.opl.computation.OptimalRunningTime
 import com.github.mbuzdalov.opl.distribution.ParameterizedDistribution
+import com.github.mbuzdalov.opl.util.NumericMinimization
 
 
 object OptimalStaticDistribution {
@@ -68,10 +68,10 @@ object OptimalStaticDistribution {
 
   def findOptimalDistribution(n: Int, lambda: Int): RunResult = {
     val objectiveFunction = new FitnessFunction(lambda)
-    val optimizer = new CMAESDistributionOptimizer(100 * n * n, 10, n, 10, (i, f) => objectiveFunction.evaluate(i, f))
-    val finalDistribution = optimizer.getBestIndividual
+    val (finalDistribution, finalFitness) = NumericMinimization.optimizeDistributionBySeparableCMAES(n,
+      objectiveFunction.evaluate, 100 * n * n, 10, 10)
     normalize(finalDistribution)
-    RunResult(optimizer.getBestFitness, finalDistribution, objectiveFunction.sequence)
+    RunResult(finalFitness, finalDistribution, objectiveFunction.sequence)
   }
 
   private class Task(n: Int, lambda: Int) extends Callable[RunResult] {

@@ -2,6 +2,8 @@ package com.github.mbuzdalov.opl.util
 
 import scala.annotation.tailrec
 
+import com.github.mbuzdalov.opl.cma.CMAESDistributionOptimizer
+
 object NumericMinimization {
   @tailrec
   def ternarySearch(fun: Double => Double, left: Double, right: Double, iterations: Int, slideRight: Boolean): Double = {
@@ -26,5 +28,14 @@ object NumericMinimization {
         }
       }
     }
+  }
+
+  def optimizeDistributionBySeparableCMAES(dimension: Int,
+                                           function: (Array[Array[Double]], Array[Double]) => Unit,
+                                           maxIterations: Int,
+                                           populationSize: Int,
+                                           nResamplingUntilFeasible: Int): (Array[Double], Double) = {
+    val optimizer = new CMAESDistributionOptimizer(maxIterations, nResamplingUntilFeasible, dimension, populationSize, (a, r) => function(a, r))
+    (optimizer.getBestIndividual, optimizer.getBestFitness)
   }
 }
