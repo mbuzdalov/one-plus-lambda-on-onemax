@@ -33,7 +33,7 @@ object NumericMinimization {
                                            maxIterations: Int,
                                            populationSize: Int,
                                            nResamplingUntilFeasible: Int): (Array[Double], Double) = {
-    import com.github.mbuzdalov.opl.cma._
+    import com.github.mbuzdalov.opl.cma.Individual
 
     // Initialize the common step size.
     var sigma = 1.0
@@ -166,14 +166,14 @@ object NumericMinimization {
       // Collect the data needed for termination condition checks.
       val maxD = max(D)
       val minD = min(D)
-      val historyBest = fitnessHistory.getMinimum
-      val historyWorst = fitnessHistory.getMaximum
+      val historyBest = fitnessHistory.minimum
+      val historyWorst = fitnessHistory.maximum
 
       // Check termination conditions.
       if (maxD / minD > 1e7
         || sigma * maxD > stopTolUpX
         || iterations > 2 && math.max(historyWorst, worstFitness) - math.min(historyBest, bestFitness) < stopTolFun
-        || iterations > fitnessHistory.getCapacity && historyWorst - historyBest < stopTolHistFun
+        || iterations > fitnessHistory.capacity && historyWorst - historyBest < stopTolHistFun
         || (0 until dimension).forall(i => !(sigma * math.max(math.abs(pc(i)), D(i)) > stopTolX))) {
         continueOptimization = false
       } else {
