@@ -28,13 +28,40 @@ object NumericMinimization {
     }
   }
 
+  class CMAIndividual(dimension: Int) extends Comparable[CMAIndividual] {
+    private val x, z, fixedX = new Array[Double](dimension)
+    private var rawFitness, fitness, penalty = 0.0
+
+    @tailrec
+    final def initialize(rng: FastRandom, xMean: Array[Double], D: Array[Double], sigma: Double, remaining: Int): Unit = {
+      penalty = 0
+      var i = 0
+      while (i < z.length) {
+        z(i) = rng.nextGaussian()
+        x(i) = xMean(i) + D(i) * z(i) * sigma
+        fixedX(i) = math.min(1, math.max(0, x(i)))
+        penalty += math.abs(x(i) - fixedX(i))
+        i += 1
+      }
+      if (penalty != 0 && remaining > 0) initialize(rng, xMean, D, sigma, remaining - 1)
+    }
+
+    def getFixedX: Array[Double] = fixedX
+    def setRawFitness(rawFitness: Double): Unit = this.rawFitness = rawFitness
+    def setPenaltyWeight(weight: Double): Unit = this.fitness = this.rawFitness + this.penalty * weight
+    def getFitness: Double = fitness
+
+    def getX(index: Int): Double = x(index)
+    def getZ(index: Int): Double = z(index)
+
+    override def compareTo(o: CMAIndividual): Int = java.lang.Double.compare(fitness, o.fitness)
+  }
+
   def optimizeDistributionBySeparableCMAES(dimension: Int,
                                            function: (Array[Array[Double]], Array[Double]) => Unit,
                                            maxIterations: Int,
                                            populationSize: Int,
                                            nResamplingUntilFeasible: Int): (Array[Double], Double) = {
-    import com.github.mbuzdalov.opl.cma.Individual
-
     // Initialize the common step size.
     var sigma = 1.0
 
@@ -87,7 +114,7 @@ object NumericMinimization {
     fitnessHistory.push(bestRunFitness)
 
     // Allocate all the memory for individuals and auxiliary fitness in/out arrays.
-    val individuals = Array.fill(populationSize)(new Individual(dimension))
+    val individuals = Array.fill(populationSize)(new CMAIndividual(dimension))
     val exportedGenomes = new Array[Array[Double]](populationSize)
     val importedFitnessValues = new Array[Double](populationSize)
 
@@ -110,7 +137,10 @@ object NumericMinimization {
       // Assign violation-discounted fitness to the individuals.
       val valueRange = max(importedFitnessValues) - min(importedFitnessValues)
       for (i <- 0 until populationSize) {
-        individuals(i).setRawFitness(importedFitnessValues(i), valueRange)
+        individuals(i).setRawFitness(importedFitnessValues(i))
+      }
+      for (i <- 0 until populationSize) {
+        individuals(i).setPenaltyWeight(valueRange)
       }
 
       // Sort the individuals. Better ones come first.
