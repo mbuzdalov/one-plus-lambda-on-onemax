@@ -44,10 +44,6 @@ public final class Individual implements Comparable<Individual> {
         this.fitness = rawFitness + penalty * penaltyScale;
     }
 
-    public boolean isFeasible() {
-        return penalty == 0;
-    }
-
     @Override
     public int compareTo(Individual o) {
         return Double.compare(fitness, o.fitness);

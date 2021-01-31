@@ -95,9 +95,9 @@ public final class CMAESDistributionOptimizer {
         fitnessHistory.push(bestRunFitness);
 
         // Allocate all the memory for individuals and auxiliary fitness in/out arrays.
-        final Individual[] individuals = new Individual[populationSize];
-        final double[][] exportedGenomes = new double[populationSize][];
-        final double[] importedFitnessValues = new double[populationSize];
+        Individual[] individuals = new Individual[populationSize];
+        double[][] exportedGenomes = new double[populationSize][];
+        double[] importedFitnessValues = new double[populationSize];
         for (int i = 0; i < populationSize; ++i) {
             individuals[i] = new Individual(dimension);
         }
@@ -158,18 +158,23 @@ public final class CMAESDistributionOptimizer {
             sigma *= Math.exp(Math.min(1, (normPS / chiN - 1) * cs / damps));
 
             // Update the best individual, and also check up the worst fitness across the iteration.
-            final double bestFitness = individuals[0].getFitness();
-            final double worstFitness = individuals[populationSize - 1].getFitness();
+            double bestFitness = individuals[0].getFitness();
+            double worstFitness = individuals[populationSize - 1].getFitness();
             if (bestRunFitness > bestFitness) {
                 bestRunFitness = bestFitness;
                 bestRunIndividual = individuals[0].getFixedX().clone();
             }
 
-            // Check termination degeneration-based criterion 1.
-            for (int i = 0; i < dimension; i++) {
-                if (sigma * D[i] > stopTolUpX) {
-                    return;
-                }
+            double maxD = max(D);
+            double minD = min(D);
+            double historyBest = fitnessHistory.getMinimum();
+            double historyWorst = fitnessHistory.getMaximum();
+
+            if (maxD / minD > 1e7
+                || sigma * maxD > stopTolUpX
+                || iterations > 2 && Math.max(historyWorst, worstFitness) - Math.min(historyBest, bestFitness) < stopTolFun
+                || iterations > fitnessHistory.getCapacity() && historyWorst - historyBest < stopTolHistFun) {
+                return;
             }
 
             // Check termination degeneration-based criterion 2.
@@ -181,23 +186,6 @@ public final class CMAESDistributionOptimizer {
                 }
             }
             if (!validated) {
-                return;
-            }
-
-            // Check whether the condition number is too high (1e14) to continue.
-            if (max(D) / min(D) > 1e7) {
-                return;
-            }
-
-            // Check termination stagnation-based criterion 1.
-            final double historyBest = fitnessHistory.getMinimum();
-            final double historyWorst = fitnessHistory.getMaximum();
-            if (iterations > 2 && Math.max(historyWorst, worstFitness) - Math.min(historyBest, bestFitness) < stopTolFun) {
-                return;
-            }
-
-            // Check termination stagnation-based criterion 2.
-            if (iterations > fitnessHistory.getCapacity() && historyWorst - historyBest < stopTolHistFun) {
                 return;
             }
 
