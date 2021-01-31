@@ -31,15 +31,15 @@ object OptimalStaticDistribution {
     private[this] var lastUpdate = 0
     private[this] val fitnessSequence = IndexedSeq.newBuilder[(Int, Double)]
 
-    def evaluate(distributions: Array[Array[Double]], fitness: Array[Double]): Unit = {
-      val n = distributions(0).length
-      val listeners = distributions.map(d => OptimalRunningTime.newListener(new FixedDistribution(d)))
+    def evaluate(individuals: Array[NumericMinimization.CMAIndividual]): Unit = {
+      val n = individuals(0).getDimension
+      val listeners = individuals.map(d => OptimalRunningTime.newListener(new FixedDistribution(d.getFixedX)))
 
       OnePlusLambda(n, lambda, listeners.toIndexedSeq, printTimings = false)
 
       for (i <- listeners.indices) {
         val result = listeners(i).toResult.expectedRunningTime
-        fitness(i) = result
+        individuals(i).setRawFitness(result)
         nCalls += 1
         if (bestFitness > result) {
           if (lastUpdate < nCalls - 1)

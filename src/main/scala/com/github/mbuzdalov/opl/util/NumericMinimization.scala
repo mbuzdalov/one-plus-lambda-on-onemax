@@ -46,10 +46,12 @@ object NumericMinimization {
       if (penalty != 0 && remaining > 0) initialize(rng, xMean, D, sigma, remaining - 1)
     }
 
+    def getDimension: Int = z.length
     def getFixedX: Array[Double] = fixedX
     def setRawFitness(rawFitness: Double): Unit = this.rawFitness = rawFitness
     def setPenaltyWeight(weight: Double): Unit = this.fitness = this.rawFitness + this.penalty * weight
     def getFitness: Double = fitness
+    def getRawFitness: Double = rawFitness
 
     def getX(index: Int): Double = x(index)
     def getZ(index: Int): Double = z(index)
@@ -58,7 +60,7 @@ object NumericMinimization {
   }
 
   def optimizeDistributionBySeparableCMAES(dimension: Int,
-                                           function: (Array[Array[Double]], Array[Double]) => Unit,
+                                           function: Array[CMAIndividual] => Unit,
                                            maxIterations: Int,
                                            populationSize: Int,
                                            nResamplingUntilFeasible: Int): (Array[Double], Double) = {
@@ -105,18 +107,19 @@ object NumericMinimization {
     // Create and evaluate the initial guess.
     val xMean = Array.fill(dimension)(random.nextDouble())
     multiply(xMean, 1 / sum(xMean))
-    val wrappedGuess = Array(xMean)
-    val fitnessHolder = new Array[Double](1)
-    function(wrappedGuess, fitnessHolder)
-    var bestRunFitness = fitnessHolder(0)
     var bestRunIndividual = xMean.clone
+    var bestRunFitness = {
+      val wrapper = new CMAIndividual(dimension)
+      wrapper.initialize(random, xMean, D, 0.0, 0)
+      function(Array(wrapper))
+      wrapper.setPenaltyWeight(1)
+      wrapper.getFitness
+    }
 
     fitnessHistory.push(bestRunFitness)
 
     // Allocate all the memory for individuals and auxiliary fitness in/out arrays.
     val individuals = Array.fill(populationSize)(new CMAIndividual(dimension))
-    val exportedGenomes = new Array[Array[Double]](populationSize)
-    val importedFitnessValues = new Array[Double](populationSize)
 
     // Do the iterations.
     var iterations = 0
@@ -125,23 +128,14 @@ object NumericMinimization {
       iterations += 1
 
       // Initialize the current population.
-      for (i <- 0 until populationSize) {
-        val ind = individuals(i)
-        ind.initialize(random, xMean, D, sigma, nResamplingUntilFeasible)
-        exportedGenomes(i) = ind.getFixedX
-      }
+      individuals.foreach(_.initialize(random, xMean, D, sigma, nResamplingUntilFeasible))
 
       // Run the fitness evaluation on all the fixed individuals.
-      function(exportedGenomes, importedFitnessValues)
+      function(individuals)
 
       // Assign violation-discounted fitness to the individuals.
-      val valueRange = max(importedFitnessValues) - min(importedFitnessValues)
-      for (i <- 0 until populationSize) {
-        individuals(i).setRawFitness(importedFitnessValues(i))
-      }
-      for (i <- 0 until populationSize) {
-        individuals(i).setPenaltyWeight(valueRange)
-      }
+      val valueRange = maxRawFitness(individuals) - minRawFitness(individuals)
+      individuals.foreach(_.setPenaltyWeight(valueRange))
 
       // Sort the individuals. Better ones come first.
       scala.util.Sorting.quickSort(individuals)
@@ -237,12 +231,40 @@ object NumericMinimization {
     result
   }
 
+  // Warning: this is not the same as array.max due to the possible presence of NaNs
+  private def maxRawFitness(array: Array[CMAIndividual]): Double = {
+    var result = Double.NegativeInfinity
+    var i = 0
+    while (i < array.length) {
+      val a = array(i).getRawFitness
+      if (result < a) {
+        result = a
+      }
+      i += 1
+    }
+    result
+  }
+
   // Warning: this is not the same as array.min due to the possible presence of NaNs
   private def min(array: Array[Double]): Double = {
     var result = Double.PositiveInfinity
     var i = 0
     while (i < array.length) {
       val a = array(i)
+      if (result > a) {
+        result = a
+      }
+      i += 1
+    }
+    result
+  }
+
+  // Warning: this is not the same as array.max due to the possible presence of NaNs
+  private def minRawFitness(array: Array[CMAIndividual]): Double = {
+    var result = Double.PositiveInfinity
+    var i = 0
+    while (i < array.length) {
+      val a = array(i).getRawFitness
       if (result > a) {
         result = a
       }
