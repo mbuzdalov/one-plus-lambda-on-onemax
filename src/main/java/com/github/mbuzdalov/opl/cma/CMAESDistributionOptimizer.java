@@ -9,7 +9,7 @@ import com.github.mbuzdalov.opl.util.FastRandom;
  * This class implements a separable CMA-ES optimizer derived from the Apache Math version
  * and refactored to suit the needs of this project.
  */
-public class CMAESDistributionOptimizer {
+public final class CMAESDistributionOptimizer {
     // Variables to store the results.
     private double[] bestRunIndividual;
     private double bestRunFitness;
@@ -113,7 +113,7 @@ public class CMAESDistributionOptimizer {
                         break;
                     }
                 }
-                exportedGenomes[i] = ind.fixedX;
+                exportedGenomes[i] = ind.getFixedX();
             }
             // Run the fitness evaluation on all the fixed individuals.
             function.accept(exportedGenomes, importedFitnessValues);
@@ -130,7 +130,7 @@ public class CMAESDistributionOptimizer {
             for (int i = 0; i < dimension; ++i) {
                 double zMeanI = 0;
                 for (int j = 0; j < mu; ++j) {
-                    zMeanI += weights[j] * individuals[j].z[i];
+                    zMeanI += weights[j] * individuals[j].getZ(i);
                 }
                 ps[i] = ps[i] * (1 - cs) + zMeanI * qCS;
                 normPS += ps[i] * ps[i];
@@ -148,8 +148,8 @@ public class CMAESDistributionOptimizer {
                 xMean[i] = 0;
                 double weighedSquare = 0;
                 for (int j = 0; j < mu; ++j) {
-                    double xi = individuals[j].x[i];
-                    double zi = individuals[j].z[i];
+                    double xi = individuals[j].getX(i);
+                    double zi = individuals[j].getZ(i);
                     double wj = weights[j];
                     xMean[i] += wj * xi;
                     weighedSquare += wj * zi * zi;
@@ -163,11 +163,11 @@ public class CMAESDistributionOptimizer {
             sigma *= Math.exp(Math.min(1, (normPS / chiN - 1) * cs / damps));
 
             // Update the best individual, and also check up the worst fitness across the iteration.
-            final double bestFitness = individuals[0].fitness;
-            final double worstFitness = individuals[populationSize - 1].fitness;
+            final double bestFitness = individuals[0].getFitness();
+            final double worstFitness = individuals[populationSize - 1].getFitness();
             if (bestRunFitness > bestFitness) {
                 bestRunFitness = bestFitness;
-                bestRunIndividual = individuals[0].fixedX.clone();
+                bestRunIndividual = individuals[0].getFixedX().clone();
             }
 
             // Check termination degeneration-based criterion 1.
@@ -207,7 +207,7 @@ public class CMAESDistributionOptimizer {
             }
 
             // Adjust step size in the case of equal function values, the case of plain population.
-            if (bestRunFitness == individuals[(int) (0.1 + populationSize / 4.0)].fitness) {
+            if (bestRunFitness == individuals[(int) (0.1 + populationSize / 4.0)].getFitness()) {
                 sigma *= Math.exp(0.2 + cs / damps);
             }
 
@@ -227,91 +227,6 @@ public class CMAESDistributionOptimizer {
 
     public double getBestFitness() {
         return bestRunFitness;
-    }
-
-    private static class Individual implements Comparable<Individual> {
-        private final double[] x, fixedX, z;
-        private double fitness, penalty;
-
-        Individual(int dimension) {
-            x = new double[dimension];
-            fixedX = new double[dimension];
-            z = new double[dimension];
-        }
-
-        void initialize(FastRandom rng, double[] xMean, double[] diagD, double sigma) {
-            penalty = 0;
-            for (int i = 0; i < z.length; ++i) {
-                z[i] = rng.nextGaussian();
-                x[i] = xMean[i] + diagD[i] * z[i] * sigma;
-                fixedX[i] = Math.min(1, Math.max(0, x[i]));
-                penalty += Math.abs(x[i] - fixedX[i]);
-            }
-        }
-
-        void setRawFitness(double rawFitness, double penaltyScale) {
-            this.fitness = rawFitness + penalty * penaltyScale;
-        }
-
-        boolean isFeasible() {
-            return penalty == 0;
-        }
-
-        @Override
-        public int compareTo(Individual o) {
-            return Double.compare(fitness, o.fitness);
-        }
-    }
-
-    private static class FitnessHistory {
-        private final double[] inputStack, outputMin, outputMax;
-        private int nInputs, nOutputs;
-        private double inputMin, inputMax;
-
-        FitnessHistory(int length) {
-            inputStack = new double[length];
-            outputMin = new double[length];
-            outputMax = new double[length];
-            inputMin = Double.POSITIVE_INFINITY;
-            inputMax = Double.NEGATIVE_INFINITY;
-        }
-
-        void push(double value) {
-            if (nInputs + nOutputs == getCapacity()) {
-                if (nOutputs == 0) {
-                    double tailMin = Double.POSITIVE_INFINITY;
-                    double tailMax = Double.NEGATIVE_INFINITY;
-                    while (nInputs > 0) {
-                        --nInputs;
-                        double popped = inputStack[nInputs];
-                        tailMin = Math.min(tailMin, popped);
-                        tailMax = Math.max(tailMax, popped);
-                        outputMin[nOutputs] = tailMin;
-                        outputMax[nOutputs] = tailMax;
-                        ++nOutputs;
-                    }
-                    inputMin = Double.POSITIVE_INFINITY;
-                    inputMax = Double.NEGATIVE_INFINITY;
-                }
-                --nOutputs;
-            }
-            inputStack[nInputs] = value;
-            ++nInputs;
-            inputMin = Math.min(inputMin, value);
-            inputMax = Math.max(inputMax, value);
-        }
-
-        int getCapacity() {
-            return inputStack.length;
-        }
-
-        double getMinimum() {
-            return nOutputs == 0 ? inputMin : Math.min(inputMin, outputMin[nOutputs - 1]);
-        }
-
-        double getMaximum() {
-            return nOutputs == 0 ? inputMax : Math.max(inputMax, outputMax[nOutputs - 1]);
-        }
     }
 
     private static double max(final double[] m) {
