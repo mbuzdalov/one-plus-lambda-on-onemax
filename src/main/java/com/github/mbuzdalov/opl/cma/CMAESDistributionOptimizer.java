@@ -55,7 +55,7 @@ public final class CMAESDistributionOptimizer {
         double damps = (1 + 2 * Math.max(0, Math.sqrt((muEff - 1) / (dimension + 1)) - 1)) *
                 Math.max(0.3, 1 - dimension / (1e-6 + maxIterations)) + cs;
         double cCov1 = 2 / ((dimension + 1.3) * (dimension + 1.3) + muEff);
-        double cCovMu = Math.min(1 - cCov1, 2 * (muEff - 2 + 1 / muEff) / ((dimension + 2) * (dimension + 2) + muEff));
+        double cCovMu = Math.min(1 - cCov1, 2 * (muEff - 2 + 1 / muEff) / ((dimension + 2.0) * (dimension + 2.0) + muEff));
         double cCov1Sep = Math.min(1, cCov1 * (dimension + 1.5) / 3);
         double cCovMuSep = Math.min(1 - cCov1, cCovMu * (dimension + 1.5) / 3);
         double chiN = Math.sqrt(dimension) * (1 - 1 / (4.0 * dimension) + 1 / (21.0 * dimension * dimension));
