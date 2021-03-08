@@ -6,7 +6,7 @@ lazy val commonSettings = Seq(
   fork := true
 )
 
-lazy val scalaTest  = "org.scalatest" %% "scalatest" % "3.2.5" % Test
+lazy val scalaTest  = "org.scalatest" %% "scalatest" % "3.2.6" % Test
 lazy val spire = "org.typelevel" %% "spire" % "0.17.0"
 
 lazy val root = project
