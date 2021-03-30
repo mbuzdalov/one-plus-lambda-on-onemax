@@ -74,6 +74,27 @@ object RuntimesOfAlgorithmsWithStaticDistributions {
     result
   }
 
+  def distributionDemo(): Unit = {
+    println("n,d,SBM,SBM_{0->1},SBM_{>0},Power 1.3,Power 1.5,Power 1.7,Fast 1.3,Fast 1.5,Fast 1.7")
+    for (n <- Seq(3, 5, 8, 11, 16, 23, 32, 45, 64, 91, 100)) {
+      val distributions = Seq(
+        standard(n),
+        shift(n),
+        resampling(n),
+        heavy(n, 1.3),
+        heavy(n, 1.5),
+        heavy(n, 1.7),
+        nevergradHeavy(n, 1.3),
+        nevergradHeavy(n, 1.5),
+        nevergradHeavy(n, 1.7),
+      )
+
+      for (d <- 0 to n) {
+        println(distributions.map(_(d)).mkString(s"$n,$d,", ",", ""))
+      }
+    }
+  }
+
   def main(args: Array[String]): Unit = {
     println(s"n,lambda,algorithm,expectation")
     for (n <- Seq(3, 5, 8, 11, 16, 23, 32, 45, 64, 91, 100); lambda <- lambdas) {
