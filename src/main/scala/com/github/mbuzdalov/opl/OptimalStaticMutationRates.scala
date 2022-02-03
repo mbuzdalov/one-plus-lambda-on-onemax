@@ -1,0 +1,75 @@
+package com.github.mbuzdalov.opl
+
+import scala.annotation.tailrec
+
+import com.github.mbuzdalov.opl.computation.OptimalRunningTime
+import com.github.mbuzdalov.opl.distribution.ParameterizedDistribution
+
+object OptimalStaticMutationRates {
+  private class FixedNonNormalizedDistribution(distribution: Array[Double]) extends ParameterizedDistribution[Unit] {
+    override def minimize(n: Int, fun: Unit => Double): (Unit, Double) = {} -> fun({})
+    override def initialize(n: Int, param: Unit, target: DoubleProbabilityVector): Unit = {
+      assert(n + 1 == distribution.length)
+      assert(math.abs(distribution.sum - 1) < 1e-10)
+      target.setBounds(0, n)
+      var i = 0
+      while (i <= n) {
+        target.setValue(i, distribution(i))
+        i += 1
+      }
+    }
+  }
+
+  private def standard(n: Int, p: Double): Array[Double] = {
+    val log1p = math.log(p)
+    val logM1p = math.log1p(-p)
+    Array.tabulate(n + 1)(i => math.exp(MathEx.logChoose(n, i) + i * log1p + (n - i) * logM1p))
+  }
+
+  private def shift(n: Int, p: Double): Array[Double] = {
+    val std = standard(n, p)
+    std(1) += std(0)
+    std(0) = 0
+    std
+  }
+
+  private def resampling(n: Int, p: Double): Array[Double] = {
+    val std = standard(n, p)
+    val sum = 1 - std(0)
+    std(0) = 0
+    for (i <- 0 to n) std(i) /= sum
+    std
+  }
+
+  private def optimize(n: Int, generator: (Int, Double) => Array[Double]): (Double, Double) = {
+    def evaluate(p: Double): Double = {
+      val listener = OptimalRunningTime.newListener(new FixedNonNormalizedDistribution(generator(n, p)))
+      OnePlusLambda(n, 1, Seq(listener), printTimings = false)
+      listener.toResult.expectedRunningTime
+    }
+
+    @tailrec
+    def go(left: Double, right: Double, iterations: Int): (Double, Double) = {
+      if (iterations == 0) {
+        val p = (left + right) / 2
+        (p, evaluate(p))
+      } else {
+        val l = (left * 2 + right) / 3
+        val r = (left + 2 * right) / 3
+        val lv = evaluate(l)
+        val rv = evaluate(r)
+        print(".")
+        if (lv < rv) go(left, r, iterations - 1) else go(l, right, iterations - 1)
+      }
+    }
+
+    go(0, 1, 100)
+  }
+
+  def main(args: Array[String]): Unit = {
+    val n = 1000
+    println(optimize(n, standard))
+    println(optimize(n, shift))
+    println(optimize(n, resampling))
+  }
+}
