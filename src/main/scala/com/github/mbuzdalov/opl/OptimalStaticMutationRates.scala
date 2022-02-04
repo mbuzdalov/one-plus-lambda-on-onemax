@@ -66,7 +66,7 @@ object OptimalStaticMutationRates {
     go(0, 1, 100)
   }
 
-  def showFixedTargetTimesForParticularSettings(): Unit = {
+  def showFixedTargetTimesForParticularSettings1(): Unit = {
     val n = 1000
     val p = 0.0011106
     val dist = new FixedNonNormalizedDistribution(standard(n, p))
@@ -78,6 +78,20 @@ object OptimalStaticMutationRates {
     }
   }
 
+  def showFixedTargetTimesForParticularSettings2(): Unit = {
+    val n = 1000
+    val flips = Seq(1, 3, 5)
+    val distributions = flips.map(f => f -> new FixedNonNormalizedDistribution(Array.tabulate(n + 1)(i => if (i == f) 1.0 else 0.0))).toMap
+    println(flips.mkString("k,", ",", ""))
+    val listeners = for (k <- 500 to 1000; (f, d) <- distributions) yield {
+      (k, f, new OptimalRunningTime(n - k).newListener(d))
+    }
+    OnePlusLambda.apply(n, 1, listeners.map(_._3), printTimings = false)
+    for ((k, listenersK) <- listeners.groupBy(_._1).toIndexedSeq.sortBy(_._1)) {
+      println(listenersK.sortBy(_._2).map(_._3.toResult.expectedRunningTime).mkString(s"$k,", ",", ""))
+    }
+  }
+
   def attemptOptimizingStaticMutationRates(): Unit = {
     val n = 1000
     println(optimize(n, standard))
@@ -86,6 +100,6 @@ object OptimalStaticMutationRates {
   }
 
   def main(args: Array[String]): Unit = {
-    showFixedTargetTimesForParticularSettings()
+    showFixedTargetTimesForParticularSettings2()
   }
 }
