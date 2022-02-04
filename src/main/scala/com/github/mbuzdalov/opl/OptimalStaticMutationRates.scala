@@ -66,10 +66,26 @@ object OptimalStaticMutationRates {
     go(0, 1, 100)
   }
 
-  def main(args: Array[String]): Unit = {
+  def showFixedTargetTimesForParticularSettings(): Unit = {
+    val n = 1000
+    val p = 0.0011106
+    val dist = new FixedNonNormalizedDistribution(standard(n, p))
+    println("k,p,t")
+    val listeners = (500 to 1000).map(k => new OptimalRunningTime(n - k).newListener(dist))
+    OnePlusLambda.apply(n, 1, listeners, printTimings = false)
+    for ((k, listener) <- (500 to 1000).lazyZip(listeners)) {
+      println(s"$k,$p,${listener.toResult.expectedRunningTime}")
+    }
+  }
+
+  def attemptOptimizingStaticMutationRates(): Unit = {
     val n = 1000
     println(optimize(n, standard))
     println(optimize(n, shift))
     println(optimize(n, resampling))
+  }
+
+  def main(args: Array[String]): Unit = {
+    showFixedTargetTimesForParticularSettings()
   }
 }
