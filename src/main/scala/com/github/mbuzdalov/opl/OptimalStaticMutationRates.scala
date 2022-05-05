@@ -74,7 +74,7 @@ object OptimalStaticMutationRates {
     val listeners = (500 to 1000).map(k => new OptimalRunningTime(n - k).newListener(dist))
     OnePlusLambda.apply(n, 1, listeners, printTimings = false)
     for ((k, listener) <- (500 to 1000).lazyZip(listeners)) {
-      println(s"$k,$p,${listener.toResult.expectedRunningTime}")
+      println(s"$k,$p,${listener.toResult.expectedRunningTime + 1}")
     }
   }
 
@@ -88,7 +88,7 @@ object OptimalStaticMutationRates {
     }
     OnePlusLambda.apply(n, 1, listeners.map(_._3), printTimings = false)
     for ((k, listenersK) <- listeners.groupBy(_._1).toIndexedSeq.sortBy(_._1)) {
-      println(listenersK.sortBy(_._2).map(_._3.toResult.expectedRunningTime).mkString(s"$k,", ",", ""))
+      println(listenersK.sortBy(_._2).map(_._3.toResult.expectedRunningTime + 1).mkString(s"$k,", ",", ""))
     }
   }
 
