@@ -1,8 +1,10 @@
 package com.github.mbuzdalov.opl
 
-import scala.annotation.tailrec
+import java.io.PrintWriter
 
-import com.github.mbuzdalov.opl.computation.OptimalRunningTime
+import scala.util.Using
+
+import com.github.mbuzdalov.opl.computation.{BareComputationListener, BareComputationResult, ComputationListener, OptimalRunningTime}
 import com.github.mbuzdalov.opl.distribution.ParameterizedDistribution
 
 object OptimalStaticMutationRates {
@@ -23,47 +25,10 @@ object OptimalStaticMutationRates {
   private def standard(n: Int, p: Double): Array[Double] = {
     val log1p = math.log(p)
     val logM1p = math.log1p(-p)
-    Array.tabulate(n + 1)(i => math.exp(MathEx.logChoose(n, i) + i * log1p + (n - i) * logM1p))
-  }
-
-  private def shift(n: Int, p: Double): Array[Double] = {
-    val std = standard(n, p)
-    std(1) += std(0)
-    std(0) = 0
-    std
-  }
-
-  private def resampling(n: Int, p: Double): Array[Double] = {
-    val std = standard(n, p)
-    val sum = 1 - std(0)
-    std(0) = 0
+    val std = Array.tabulate(n + 1)(i => math.exp(MathEx.logChoose(n, i) + i * log1p + (n - i) * logM1p))
+    val sum = std.sum
     for (i <- 0 to n) std(i) /= sum
     std
-  }
-
-  private def optimize(n: Int, generator: (Int, Double) => Array[Double]): (Double, Double) = {
-    def evaluate(p: Double): Double = {
-      val listener = OptimalRunningTime.newListener(new FixedNonNormalizedDistribution(generator(n, p)))
-      OnePlusLambda(n, 1, Seq(listener), printTimings = false)
-      listener.toResult.expectedRunningTime
-    }
-
-    @tailrec
-    def go(left: Double, right: Double, iterations: Int): (Double, Double) = {
-      if (iterations == 0) {
-        val p = (left + right) / 2
-        (p, evaluate(p))
-      } else {
-        val l = (left * 2 + right) / 3
-        val r = (left + 2 * right) / 3
-        val lv = evaluate(l)
-        val rv = evaluate(r)
-        print(".")
-        if (lv < rv) go(left, r, iterations - 1) else go(l, right, iterations - 1)
-      }
-    }
-
-    go(0, 1, 100)
   }
 
   def showFixedTargetTimesForParticularSettings1(): Unit = {
@@ -78,28 +43,83 @@ object OptimalStaticMutationRates {
     }
   }
 
-  def showFixedTargetTimesForParticularSettings2(): Unit = {
-    val n = 1000
-    val flips = Seq(1, 3, 5)
-    val distributions = flips.map(f => f -> new FixedNonNormalizedDistribution(Array.tabulate(n + 1)(i => if (i == f) 1.0 else 0.0))).toMap
-    println(flips.mkString("k,", ",", ""))
-    val listeners = for (k <- 500 to 1000; (f, d) <- distributions) yield {
-      (k, f, new OptimalRunningTime(n - k).newListener(d))
-    }
-    OnePlusLambda.apply(n, 1, listeners.map(_._3), printTimings = false)
-    for ((k, listenersK) <- listeners.groupBy(_._1).toIndexedSeq.sortBy(_._1)) {
-      println(listenersK.sortBy(_._2).map(_._3.toResult.expectedRunningTime + 1).mkString(s"$k,", ",", ""))
+  def rlsWithFixedNumberOfFlips(): Unit = {
+    Using.resource(new PrintWriter("rls-fixed-flips.csv")) { out =>
+      val n = 1000
+      val flips = Seq(1, 3, 5)
+      val distributions = flips.map(f => f -> new FixedNonNormalizedDistribution(Array.tabulate(n + 1)(i => if (i == f) 1.0 else 0.0))).toMap
+      out.println(flips.mkString("k,", ",", ""))
+      val listeners = for (k <- 500 to 1000; (f, d) <- distributions) yield {
+        (k, f, new OptimalRunningTime(n - k).newListener(d))
+      }
+      OnePlusLambda.apply(n, 1, listeners.map(_._3), printTimings = false)
+      for ((k, listenersK) <- listeners.groupBy(_._1).toIndexedSeq.sortBy(_._1)) {
+        out.println(listenersK.sortBy(_._2).map(_._3.toResult.expectedRunningTime + 1).mkString(s"$k,", ",", ""))
+      }
     }
   }
 
-  def attemptOptimizingStaticMutationRates(): Unit = {
+
+  def eaWithStaticParameters(): Unit = {
     val n = 1000
-    println(optimize(n, standard))
-    println(optimize(n, shift))
-    println(optimize(n, resampling))
+    class Task(val target: Int) {
+      private[this] var left = 0.0
+      private[this] var right = 1.0
+      private[this] var midLeftListener, midRightListener, midListener: Option[ComputationListener[Unit]] = None
+
+      private def midLP: Double = (left * 2 + right) / 3
+      private def midRP: Double = (left + 2 * right) / 3
+      private def midP: Double = (left + right) / 2
+      private def createListener(p: Double): ComputationListener[Unit] =
+        new OptimalRunningTime(n - target).newListener(new FixedNonNormalizedDistribution(standard(n, p)))
+
+      def nextListeners(isFinalRun: Boolean): Seq[BareComputationListener] = {
+        if (midLeftListener.isDefined && midRightListener.isDefined) {
+          if (midLeftListener.get.toResult.expectedRunningTime < midRightListener.get.toResult.expectedRunningTime) {
+            right = midRP
+          } else {
+            left = midLP
+          }
+        }
+        if (isFinalRun) {
+          midListener = Some(createListener(midP))
+          Seq(midListener.get)
+        } else {
+          midLeftListener = Some(createListener(midLP))
+          midRightListener = Some(createListener(midRP))
+          Seq(midLeftListener.get, midRightListener.get)
+        }
+      }
+
+      def finalResult: BareComputationResult = midListener.get.toResult
+      def finalRate: Double = midP
+    }
+
+    Using.resource(new PrintWriter("1p1-optimal-static-rates.csv")) { out =>
+      val tasks = (n / 2 to n).map(t => new Task(t))
+      val maxIt = 100
+      for (it <- 0 to maxIt) {
+        OnePlusLambda.apply(n, 1, tasks.flatMap(_.nextListeners(it == maxIt)), printTimings = false)
+        println(s"Iteration $it/$maxIt ended")
+      }
+      val finalResults = tasks.map(t => (t.target, t.finalRate, t.finalResult))
+      val gp = finalResults.last._2
+      val gvTasks = (n / 2 to n).map(k => new OptimalRunningTime(n - k).newListener(new FixedNonNormalizedDistribution(standard(n, gp))))
+      OnePlusLambda.apply(n, 1, gvTasks, printTimings = false)
+      println("Final evaluation done")
+      out.println("k,gp*n,gv,lp*n,lv,gv/lv")
+      for (((k, lp, lr), gr) <- finalResults.lazyZip(gvTasks)) {
+        val lv = lr.expectedRunningTime + 1
+        val gv = gr.toResult.expectedRunningTime + 1
+        out.println(s"$k,${gp * n},$gv,${lp * n},$lv,${gv / lv}")
+      }
+    }
   }
 
   def main(args: Array[String]): Unit = {
-    showFixedTargetTimesForParticularSettings2()
+    args(0) match {
+      case "1p1-optimal-static-rates" => eaWithStaticParameters()
+      case "rls-fixed-flips" => rlsWithFixedNumberOfFlips()
+    }
   }
 }
