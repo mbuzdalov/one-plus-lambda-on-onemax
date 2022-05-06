@@ -1,11 +1,15 @@
 package com.github.mbuzdalov.opl
 
-import java.io.PrintWriter
+import java.awt.image.BufferedImage
+import java.io.{FileOutputStream, PrintWriter}
+
+import javax.imageio.ImageIO
 
 import scala.util.Using
 
 import com.github.mbuzdalov.opl.computation.{BareComputationListener, BareComputationResult, ComputationListener, OptimalRunningTime}
-import com.github.mbuzdalov.opl.distribution.ParameterizedDistribution
+import com.github.mbuzdalov.opl.distribution.{FlipKBits, ParameterizedDistribution}
+import com.github.mbuzdalov.opl.util.Viridis
 
 object OptimalStaticMutationRates {
   private class FixedNonNormalizedDistribution(distribution: Array[Double]) extends ParameterizedDistribution[Unit] {
@@ -59,6 +63,75 @@ object OptimalStaticMutationRates {
     }
   }
 
+  def optimalDynamicRLS(): Unit = {
+    val n = 1000
+    Using.resource(new PrintWriter("rls-optimal-dynamic.csv")) { out =>
+      val listener = OptimalRunningTime.newListener(FlipKBits)
+      OnePlusLambda.apply(n, 1, Seq(listener), printTimings = false)
+      val result = listener.toResult
+      out.println("k,f,time")
+      for (k <- 999 to 500 by -1) {
+        out.println(s"$k,${result.optimalParameter(n - k)},${result.optimalExpectation(n - k)}")
+      }
+    }
+  }
+
+  def targetDynamicRLS(): Unit = {
+    val n = 1000
+    Using.resource(new PrintWriter("rls-target-dynamic.csv")) { out =>
+      val targets = Seq(550, 570, 590, 610, 630, 650, 1000)
+      val listeners = targets.map(k => new OptimalRunningTime(n - k).newListener(FlipKBits))
+      OnePlusLambda.apply(n, 1, listeners, printTimings = false)
+      val results = listeners.map(_.toResult)
+      out.println(targets.mkString("k,", ",", ""))
+      for (k <- 500 to 700) {
+        out.print(k)
+        for (r <- results) {
+          out.print(",")
+          val v = r.optimalExpectation(n - k)
+          if (v > 0) {
+            out.print(r.optimalParameter(n - k))
+          }
+        }
+        out.println()
+      }
+    }
+  }
+
+  def pictureTargetDynamicRLS(): Unit = {
+    val n = 1000
+    val vMax = 670
+
+    val targets = (500 to vMax) :+ 1000
+    val listeners = targets.map(k => new OptimalRunningTime(n - k).newListener(FlipKBits))
+    OnePlusLambda.apply(n, 1, listeners, printTimings = false)
+    val results = listeners.map(_.toResult)
+
+    val hh = vMax - 500 + 1
+    val heatmap = new BufferedImage(vMax - 500, hh, BufferedImage.TYPE_INT_RGB)
+    for (x <- 500 until vMax) {
+      val maxFlips = results.last.optimalParameter(n - x)
+      for (y <- 500 to vMax) {
+        val hx = x - 500
+        val hy = hh - 1 - (y - 500)
+        lazy val value = results(y - 500).optimalParameter(n - x)
+        if (x > y) {
+          // undefined
+          heatmap.setRGB(hx, hy, 0xffffff)
+        } else if (value > maxFlips) {
+          heatmap.setRGB(hx, hy, 0xff0000)
+          println(s"x = $x, optimal flips = $maxFlips, flips for target $y = $value")
+        } else {
+          val relativeDiff = (maxFlips - value).toDouble / maxFlips
+          // 0 means yellow, 1 means blue
+          heatmap.setRGB(hx, hy, Viridis(1 - relativeDiff))
+        }
+      }
+    }
+    val heatmapOut = new FileOutputStream("opt-dynamic-heatmap.png")
+    ImageIO.write(heatmap, "png", heatmapOut)
+    heatmapOut.close()
+  }
 
   def eaWithStaticParameters(): Unit = {
     val n = 1000
@@ -120,6 +193,9 @@ object OptimalStaticMutationRates {
     args(0) match {
       case "1p1-optimal-static-rates" => eaWithStaticParameters()
       case "rls-fixed-flips" => rlsWithFixedNumberOfFlips()
+      case "rls-optimal-dynamic" => optimalDynamicRLS()
+      case "rls-target-dynamic" => targetDynamicRLS()
+      case "rls-target-heatmap" => pictureTargetDynamicRLS()
     }
   }
 }
