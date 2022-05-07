@@ -35,6 +35,8 @@ object OptimalStaticMutationRates {
     std
   }
 
+  private def singular(n: Int, k: Int): Array[Double] = Array.tabulate(n + 1)(i => if (k == i) 1.0 else 0.0)
+
   def showFixedTargetTimesForParticularSettings1(): Unit = {
     val n = 1000
     val p = 0.0011106
@@ -59,6 +61,22 @@ object OptimalStaticMutationRates {
       OnePlusLambda.apply(n, 1, listeners.map(_._3), printTimings = false)
       for ((k, listenersK) <- listeners.groupBy(_._1).toIndexedSeq.sortBy(_._1)) {
         out.println(listenersK.sortBy(_._2).map(_._3.toResult.expectedRunningTime + 1).mkString(s"$k,", ",", ""))
+      }
+    }
+  }
+
+  def targetStaticRLS(): Unit = {
+    val n = 1000
+    Using.resource(new PrintWriter("rls-target-static.csv")) { out =>
+      out.println("k,f,v")
+      for (k <- 1000 to 500 by -1) {
+        val listeners = (1 to 1000).map(b => new OptimalRunningTime(n - k).newListener(new FixedNonNormalizedDistribution(singular(n, b))))
+        OnePlusLambda.apply(n, 1, listeners, printTimings = false)
+        val results = listeners.map(_.toResult.expectedRunningTime + 1)
+        val best = results.min
+        val line = s"$k,${results.indexOf(best) + 1},$best"
+        println(line)
+        out.println(line)
       }
     }
   }
@@ -195,6 +213,7 @@ object OptimalStaticMutationRates {
       case "rls-fixed-flips" => rlsWithFixedNumberOfFlips()
       case "rls-optimal-dynamic" => optimalDynamicRLS()
       case "rls-target-dynamic" => targetDynamicRLS()
+      case "rls-target-static" => targetStaticRLS()
       case "rls-target-heatmap" => pictureTargetDynamicRLS()
     }
   }
