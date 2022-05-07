@@ -2,10 +2,16 @@
 
 This repository contributes to parameter analysis
 of various flavours of the (1+λ) EA on the OneMax problem.
-It accompanies the following paper:
+It accompanies the following papers:
 
 Buzdalov M., Doerr C. Optimal Mutation Rates for the (1+λ) EA on OneMax
 // Parallel Problem Solving from Nature XVI -- 2020 -- P.574-587 -- Lecture Notes in Computer Science, no. 12270.
+
+Buzdalov M., Doerr C. Optimal Static Mutation Strength Distributions for the (1+λ) Evolutionary Algorithm on OneMax
+// Proceedings of Genetic and Evolutionary Computation Conference -- 2021 -- P.660-668.
+
+Vinokurov D., Buzdalov M. On Optimal Static and Dynamic Parameter Choices for Fixed-Target Optimization.
+// Proceedings of Genetic and Evolutionary Computation Conference -- 2022.
 
 # Motivation
 
