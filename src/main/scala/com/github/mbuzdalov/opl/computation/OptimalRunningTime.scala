@@ -5,7 +5,9 @@ import com.github.mbuzdalov.opl.{DoubleProbabilityVector, TransitionMatrix}
 
 import scala.reflect.ClassTag
 
-object OptimalRunningTime {
+object OptimalRunningTime extends OptimalRunningTime(0)
+
+class OptimalRunningTime(maxOptimumDistance: Int) {
   def newListener[@specialized P](distribution: ParameterizedDistribution[P],
                                   optionalCallbackWrapper: Option[callback.Wrapper[P]] = None)
                                  (implicit classTag: ClassTag[P]): ComputationListener[P] =
@@ -32,16 +34,20 @@ object OptimalRunningTime {
     }
 
     override def processDistance(distance: Int, matrix: TransitionMatrix): Unit = {
-      val (parameter, value) = distribution.minimize(problemSize, p => evaluate(matrix, p))
-      expectations(distance) = value
-      bestParameter(distance - 1) = parameter
+      if (distance > maxOptimumDistance) {
+        val (parameter, value) = distribution.minimize(problemSize, p => evaluate(matrix, p))
+        expectations(distance) = value
+        bestParameter(distance - 1) = parameter
 
-      optionalCallbackWrapper match {
-        case Some(callbackWrapper) =>
-          for (i <- callbackWrapper.parameters.indices)
-            callbackWrapper.valuesPlaceholder(i) = evaluate(matrix, callbackWrapper.parameters(i))
-          callbackWrapper.run(distance, parameter, value)
-        case None =>
+        optionalCallbackWrapper match {
+          case Some(callbackWrapper) =>
+            for (i <- callbackWrapper.parameters.indices)
+              callbackWrapper.valuesPlaceholder(i) = evaluate(matrix, callbackWrapper.parameters(i))
+            callbackWrapper.run(distance, parameter, value)
+          case None =>
+        }
+      } else {
+        expectations(distance) = 0.0
       }
     }
 
