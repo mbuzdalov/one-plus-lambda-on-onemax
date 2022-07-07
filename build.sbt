@@ -7,7 +7,7 @@ lazy val commonSettings = Seq(
 )
 
 lazy val scalaTest  = "org.scalatest" %% "scalatest" % "3.2.12" % Test
-lazy val spire = "org.typelevel" %% "spire" % "0.17.0"
+lazy val spire = "org.typelevel" %% "spire" % "0.18.0"
 
 lazy val root = project
   .in(file("."))
