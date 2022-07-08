@@ -26,7 +26,7 @@ object BigDecimalTransitionMatrixFactory extends TransitionMatrixFactory {
           var k = l
           var sum = lF(0)
           while (k <= u) {
-            val v = (common - lF(k) - lF(d - k) - lF(change - k) - lF(n - d - change + k)).exp()
+            val v = (common - lF(k) - lF(d - k) - lF(change - k) - lF(n - d - change + k)).exp
             target(k - l) = v.toDouble
             sum += v
             k += 1

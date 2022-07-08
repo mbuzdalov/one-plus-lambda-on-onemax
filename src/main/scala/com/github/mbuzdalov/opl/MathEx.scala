@@ -37,7 +37,7 @@ object MathEx {
         var sz = bdLogFactorialCache.size()
         var last = bdLogFactorialCache.get(sz - 1)
         while (sz <= n) {
-          last += BigDecimal.decimal(sz, bigLogFactorialContext).log()
+          last += BigDecimal.decimal(sz, bigLogFactorialContext).log
           bdLogFactorialCache.add(last)
           sz += 1
         }
