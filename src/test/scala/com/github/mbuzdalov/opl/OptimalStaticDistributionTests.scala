@@ -19,8 +19,8 @@ class OptimalStaticDistributionTests extends AnyFlatSpec with Matchers {
     }.minBy(_.fitness)
 
     result.fitness shouldBe (8.06115492800143 +- 1e-12)
-    result.distribution(0) shouldBe (0.9828011749325332 +- 1e-8)
-    result.distribution(9) shouldBe (0.01719882506746691 +- 1e-8)
+    result.distribution(0) shouldBe (0.9828011749325332 +- 2e-8)
+    result.distribution(9) shouldBe (0.01719882506746691 +- 2e-8)
     for (i <- 1 until 8) {
       result.distribution(i) shouldBe (0.0 +- 1e-15)
     }
