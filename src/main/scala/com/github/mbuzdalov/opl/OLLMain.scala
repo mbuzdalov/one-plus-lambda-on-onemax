@@ -1,7 +1,9 @@
 package com.github.mbuzdalov.opl
 
 object OLLMain {
-  class Evaluator(n: Int, debugOutput: Boolean) {
+  class Evaluator(n: Int,
+                  neverMutateZeroBits: Boolean,
+                  debugOutput: Boolean) {
     val lambdas: Array[Int] = Array.ofDim[Int](n + 1)
     val runtimes: Array[Double] = Array.ofDim[Double](n + 1)
     val totalRuntime: Double = {
@@ -60,6 +62,12 @@ object OLLMain {
       var sumW, sumP = 0.0
       val probOfReachingF = Array.ofDim[Double](n + 1)
 
+      // neverMutateZeroBits: since this influences only the cases where we mutate nothing,
+      // we account for it by dividing the probability of success by 1-(1-mProb)^n.
+      val mutationScale = if (neverMutateZeroBits)
+        1 / (1 - math.exp(n * log1MProb))
+      else 1
+
       // All that we do we condition on the distance between the parent and offspring.
       var d = 1
       while (d <= n) {
@@ -91,7 +99,8 @@ object OLLMain {
             // Filling the probability of reaching a fitness (probOfReachingF(i) corresponds to fitness x + i)
             // in one application of crossover
             if (xProb == 1) {
-              // Everything is flipped. This is a special quick case, as only one possible offspring is generated
+              // Everything is flipped, so we basically consider the best offspring.
+              // This is a special quick case, as only one possible offspring is generated
               val theFitness = g - (d - g)
               dProbability += pOfThisGInAllMutations
               dExpectation += pOfThisGInAllMutations * runtimes(x + theFitness)
@@ -171,7 +180,7 @@ object OLLMain {
         val multipleHere = if (mProb == 1)
           if (n == d) 1.0 else 0.0
         else
-          math.exp(MathEx.logChoose(n, d) + d * logMProb + (n - d) * log1MProb)
+          math.exp(MathEx.logChoose(n, d) + d * logMProb + (n - d) * log1MProb) * mutationScale
         assert(dProbability.isFinite, s"Shit: dProbability = $dProbability")
         assert(multipleHere.isFinite, s"Shit: multipleHere = $multipleHere, d = $d, mProb = $mProb")
         sumP += dProbability * multipleHere
@@ -195,7 +204,7 @@ object OLLMain {
   def main(args: Array[String]): Unit = {
     val n = args(0).toInt
     val t0 = System.nanoTime()
-    val evaluator = new Evaluator(n, debugOutput = true)
+    val evaluator = new Evaluator(n, neverMutateZeroBits = true, debugOutput = true)
     println(s"Total runtime: ${evaluator.totalRuntime}")
     println(s"Time consumed: ${(System.nanoTime() - t0) * 1e-9} s")
   }
