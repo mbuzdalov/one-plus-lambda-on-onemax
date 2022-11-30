@@ -32,9 +32,6 @@ object OLLMain {
           if (lambda == 1) {
             valueAt1 = value
           }
-          if (worseInARow > 2) { // we hope for decent convexity of value as a function of lambda
-            lambda = n // essentially, break
-          }
           lambda += 1
         }
         runtimes(x) = bestValue
@@ -211,7 +208,7 @@ object OLLMain {
     val t0 = System.nanoTime()
     val evaluator = new Evaluator(n,
       neverMutateZeroBits = true,
-      includeBestMutantInComparison = true,
+      includeBestMutantInComparison = false,
       debugOutput = true)
     println(s"Total runtime: ${evaluator.totalRuntime}")
     println(s"Time consumed: ${(System.nanoTime() - t0) * 1e-9} s")
