@@ -16,14 +16,21 @@ object OLLMain {
         var bestValue = Double.PositiveInfinity
         var valueAt1 = Double.NaN
         var lambda = 1
+        var worseInARow = 0
         while (lambda <= n) {
           val value = findRuntime(x, runtimes, lambda)
           if (value < bestValue) {
             bestValue = value
             bestLambda = lambda
           }
+          if (value > bestValue) {
+            worseInARow += 1
+          }
           if (lambda == 1) {
             valueAt1 = value
+          }
+          if (worseInARow > 2) { // we hope for decent convexity of value as a function of lambda
+            lambda = n // essentially, break
           }
           lambda += 1
         }
