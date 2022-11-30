@@ -15,6 +15,9 @@ object OLLMain {
 
       val pool = new ScheduledThreadPoolExecutor(Runtime.getRuntime.availableProcessors())
       val pw = output.map(name => new PrintWriter(new FileOutputStream(name), true))
+      pw.foreach(_.println(s"# n=$n"))
+      pw.foreach(_.println(s"# --never-mutate-zero-bits=$neverMutateZeroBits"))
+      pw.foreach(_.println(s"# --include-best-mutant=$includeBestMutantInComparison"))
       pw.foreach(_.println("fitness,best-lambda,runtime-to-optimum,runtime-to-optimum-for-lambda-one"))
 
       var theTotalRuntime = 0.0
