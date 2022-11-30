@@ -3,12 +3,81 @@ package com.github.mbuzdalov.opl
 import java.io.{FileOutputStream, PrintWriter}
 import java.util.concurrent.{Callable, ScheduledThreadPoolExecutor}
 
+import scala.annotation.tailrec
+
 object OLLMain {
   class Evaluator(n: Int,
                   neverMutateZeroBits: Boolean,
                   includeBestMutantInComparison: Boolean,
                   ignoreCrossoverParentDuplicates: Boolean,
+                  maxCacheByteSize: Long,
                   output: Option[String]) {
+    private case class CacheEntry(d: Int, g: Int, popSize: Int, xProb: Double) {
+      def byteSize: Int = (g + 5) * 8
+
+      lazy val result: Array[Double] = {
+        val probOfReachingF = Array.ofDim[Double](g + 1)
+
+        val xOver1X = xProb / (1 - xProb)
+        var goodFlip = 1
+        var p0 = xProb * math.pow(1 - xProb, d - 1) * g
+        while (goodFlip <= g) {
+          val badFlipLimit = math.min(goodFlip - 1, d - g)
+          var badFlip = 0
+          var p = p0
+          while (badFlip <= badFlipLimit) {
+            probOfReachingF(goodFlip - badFlip) += p
+            p *= xOver1X * (d - g - badFlip)
+            badFlip += 1
+            p /= badFlip
+          }
+          p0 *= xOver1X * (g - goodFlip)
+          goodFlip += 1
+          p0 /= goodFlip
+        }
+
+        // The remaining probability is for being no better
+        var probOfReachingFSum = 0.0
+
+        {
+          var i = 1
+          while (i <= g) {
+            probOfReachingFSum += probOfReachingF(i)
+            i += 1
+          }
+        }
+        probOfReachingF(0) = 1.0 - probOfReachingFSum
+        if (probOfReachingF(0) < 0) {
+          assert(probOfReachingF(0) >= -1e-9)
+          probOfReachingF(0) = 0
+        }
+
+        // The above was for one application of crossover. Now it's time to use popSize
+        if (popSize > 1) {
+          var sum = 0.0
+          probOfReachingFSum = 0
+          var i = 0
+          while (i <= g) {
+            val newSum = sum + probOfReachingF(i)
+            probOfReachingF(i) = math.pow(newSum, popSize) - math.pow(sum, popSize)
+            probOfReachingFSum += probOfReachingF(i)
+            sum = newSum
+            i += 1
+          }
+
+          assert(math.abs(1 - sum) < 1e-9, "Total probability is not 1")
+          assert(math.abs(1 - probOfReachingFSum) < 1e-9, "Population sizing fails")
+        }
+
+        probOfReachingF
+      }
+    }
+    private val cacheEntryOrdering: Ordering[CacheEntry] =
+      (x: CacheEntry, y: CacheEntry) => -java.lang.Long.compare(x.g, y.g)
+    private val probOfReachingFCache = new scala.collection.mutable.HashMap[CacheEntry, CacheEntry]
+    private val cacheEntryQueue = new scala.collection.mutable.PriorityQueue[CacheEntry]()(cacheEntryOrdering)
+    private var cacheByteSize, queries, hits, misses = 0L
+
     val lambdas: Array[Int] = Array.ofDim[Int](n + 1)
     val runtimes: Array[Double] = Array.ofDim[Double](n + 1)
     val totalRuntime: Double = {
@@ -59,20 +128,58 @@ object OLLMain {
       pool.shutdown()
       theTotalRuntime
     }
+    probOfReachingFCache.clear()
+
+
+    @tailrec
+    private def tryAddEntry(e: CacheEntry): Unit = {
+      val newCacheByteSize = cacheByteSize + e.byteSize
+      if (newCacheByteSize <= maxCacheByteSize) {
+        probOfReachingFCache.put(e, e)
+        cacheEntryQueue.addOne(e)
+        cacheByteSize = newCacheByteSize
+      } else {
+        val queueTop = cacheEntryQueue.head
+        if (e.g > queueTop.g) {
+          cacheEntryQueue.dequeue()
+          probOfReachingFCache.remove(queueTop)
+          cacheByteSize -= queueTop.byteSize
+          tryAddEntry(e)
+        }
+      }
+    }
+
+    private def computeProbOfReachingF(d: Int, g: Int, popSize: Int, xProb: Double): Array[Double] = {
+      val entry = CacheEntry(d, g, popSize, xProb)
+      probOfReachingFCache.synchronized {
+        assert(probOfReachingFCache.size == cacheEntryQueue.size)
+
+        val realEntry = if (probOfReachingFCache.contains(entry)) {
+          hits += 1
+          probOfReachingFCache(entry)
+        } else {
+          misses += 1
+          tryAddEntry(entry)
+          entry
+        }
+        queries += 1
+        if (queries % 1000000 == 0) {
+          println(s"[$queries queries, $hits hits, $misses misses, cache size ${probOfReachingFCache.size}, $cacheByteSize bytes in arrays]")
+        }
+        realEntry
+      }.result
+    }
 
     private def findRuntime(x: Int, lambda: Double): Double = {
       val popSize = math.round(lambda).toInt
       val mProb = lambda / n
       val xProb = 1 / lambda
 
-      val xOver1X = xProb / (1 - xProb)
-
       val logMProb = math.log(mProb)
       val log1MProb = math.log1p(-mProb)
 
       var sumW, sumP = 0.0
       var expectedPopSize = 0.0
-      val probOfReachingF = Array.ofDim[Double](n + 1)
 
       // neverMutateZeroBits #1: we divide the probability of flipping exactly d bits by 1-(1-mProb)^n.
       val mutationScale = if (neverMutateZeroBits)
@@ -127,73 +234,20 @@ object OLLMain {
               dProbability += pOfThisGInAllMutations
               dExpectation += pOfThisGInAllMutations * runtimes(x + theFitness)
             } else {
-              var goodFlip = 1
-              var p0 = xProb * math.pow(1 - xProb, d - 1) * g
-              while (goodFlip <= g) {
-                probOfReachingF(goodFlip) = 0.0
-                val badFlipLimit = math.min(goodFlip - 1, d - g)
-                var badFlip = 0
-                var p = p0
-                while (badFlip <= badFlipLimit) {
-                  probOfReachingF(goodFlip - badFlip) += p
-                  p *= xOver1X * (d - g - badFlip)
-                  badFlip += 1
-                  p /= badFlip
-                }
-                p0 *= xOver1X * (g - goodFlip)
-                goodFlip += 1
-                p0 /= goodFlip
+              val probOfReachingF = computeProbOfReachingF(d, g, popSize, xProb)
+              var xProbOfImprovement, xRemainingTime = 0.0
+              // includeBestMutantInComparison: we compute the probabilities of getting all fitness values,
+              // but for those smaller than the best mutant, which we know, we use the runtime value
+              // corresponding to the best mutant
+              val minimumFitnessToUse = if (includeBestMutantInComparison) g - (d - g) else -1
+              var i = 1
+              while (i <= g) {
+                xProbOfImprovement += probOfReachingF(i)
+                xRemainingTime += probOfReachingF(i) * runtimes(x + math.max(i, minimumFitnessToUse))
+                i += 1
               }
-
-              // The remaining probability is for being no better
-              var probOfReachingFSum = 0.0
-
-              {
-                var i = 1
-                while (i <= g) {
-                  probOfReachingFSum += probOfReachingF(i)
-                  i += 1
-                }
-              }
-              probOfReachingF(0) = 1.0 - probOfReachingFSum
-              if (probOfReachingF(0) < 0) {
-                assert(probOfReachingF(0) >= -1e-9)
-                probOfReachingF(0) = 0
-              }
-
-              // The above was for one application of crossover. Now it's time to use popSize
-              if (popSize > 1) {
-                var sum = 0.0
-                probOfReachingFSum = 0
-                var i = 0
-                while (i <= g) {
-                  val newSum = sum + probOfReachingF(i)
-                  probOfReachingF(i) = math.pow(newSum, popSize) - math.pow(sum, popSize)
-                  probOfReachingFSum += probOfReachingF(i)
-                  sum = newSum
-                  i += 1
-                }
-
-                assert(math.abs(1 - sum) < 1e-9, "Total probability is not 1")
-                assert(math.abs(1 - probOfReachingFSum) < 1e-9, "Population sizing fails")
-              }
-
-              // Finally, compute the remaining time & probability, given g
-              {
-                var xProbOfImprovement, xRemainingTime = 0.0
-                var i = 1
-                // includeBestMutantInComparison: we compute the probabilities of getting all fitness values,
-                // but for those smaller than the best mutant, which we know, we use the runtime value
-                // corresponding to the best mutant
-                val minimumFitnessToUse = if (includeBestMutantInComparison) g - (d - g) else -1
-                while (i <= g) {
-                  xProbOfImprovement += probOfReachingF(i)
-                  xRemainingTime += probOfReachingF(i) * runtimes(x + math.max(i, minimumFitnessToUse))
-                  i += 1
-                }
-                dProbability += pOfThisGInAllMutations * xProbOfImprovement
-                dExpectation += pOfThisGInAllMutations * xRemainingTime
-              }
+              dProbability += pOfThisGInAllMutations * xProbOfImprovement
+              dExpectation += pOfThisGInAllMutations * xRemainingTime
             }
           }
 
@@ -241,6 +295,18 @@ object OLLMain {
     }
   }
 
+  //noinspection SameParameterValue
+  private def getLongOption(args: Array[String], name: String): Long = {
+    val prefix = "--" + name + "="
+    args.find(_.startsWith(prefix)) match {
+      case Some(arg) => arg.substring(prefix.length).toLongOption match {
+        case Some(value) => value
+        case None => throw new IllegalArgumentException(s"--$name is not followed by a valid 64-bit integer")
+      }
+      case None => throw new IllegalArgumentException(s"No option --$name is given (expected $prefix<number>")
+    }
+  }
+
   def main(args: Array[String]): Unit = {
     val n = args(0).toInt
     val printSummary = getBooleanOption(args, "print-summary")
@@ -249,6 +315,7 @@ object OLLMain {
       neverMutateZeroBits = getBooleanOption(args, "never-mutate-zero-bits"),
       includeBestMutantInComparison = getBooleanOption(args, "include-best-mutant"),
       ignoreCrossoverParentDuplicates = getBooleanOption(args, "ignore-crossover-parent-duplicates"),
+      maxCacheByteSize = getLongOption(args, "max-cache-byte-size"),
       output = args.find(_.startsWith("--output=")).map(_.substring("--output=".length)))
     if (printSummary) {
       println(s"Total runtime: ${evaluator.totalRuntime}")
