@@ -3,6 +3,7 @@ package com.github.mbuzdalov.opl
 object OLLMain {
   class Evaluator(n: Int,
                   neverMutateZeroBits: Boolean,
+                  includeBestMutantInComparison: Boolean,
                   debugOutput: Boolean) {
     val lambdas: Array[Int] = Array.ofDim[Int](n + 1)
     val runtimes: Array[Double] = Array.ofDim[Double](n + 1)
@@ -160,9 +161,13 @@ object OLLMain {
               {
                 var xProbOfImprovement, xRemainingTime = 0.0
                 var i = 1
+                // includeBestMutantInComparison: we compute the probabilities of getting all fitness values,
+                // but for those smaller than the best mutant, which we know, we use the runtime value
+                // corresponding to the best mutant
+                val minimumFitnessToUse = if (includeBestMutantInComparison) g - (d - g) else -1
                 while (i <= g) {
                   xProbOfImprovement += probOfReachingF(i)
-                  xRemainingTime += probOfReachingF(i) * runtimes(x + i)
+                  xRemainingTime += probOfReachingF(i) * runtimes(x + math.max(i, minimumFitnessToUse))
                   i += 1
                 }
                 dProbability += pOfThisGInAllMutations * xProbOfImprovement
@@ -204,7 +209,10 @@ object OLLMain {
   def main(args: Array[String]): Unit = {
     val n = args(0).toInt
     val t0 = System.nanoTime()
-    val evaluator = new Evaluator(n, neverMutateZeroBits = true, debugOutput = true)
+    val evaluator = new Evaluator(n,
+      neverMutateZeroBits = true,
+      includeBestMutantInComparison = true,
+      debugOutput = true)
     println(s"Total runtime: ${evaluator.totalRuntime}")
     println(s"Time consumed: ${(System.nanoTime() - t0) * 1e-9} s")
   }
