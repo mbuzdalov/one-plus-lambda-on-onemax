@@ -194,8 +194,8 @@ object OLLMain {
           if (n == d) 1.0 else 0.0
         else
           math.exp(MathEx.logChoose(n, d) + d * logMProb + (n - d) * log1MProb) * mutationScale
-        assert(dProbability.isFinite, s"Shit: dProbability = $dProbability")
-        assert(multipleHere.isFinite, s"Shit: multipleHere = $multipleHere, d = $d, mProb = $mProb")
+        assert(dProbability.isFinite, s"dProbability = $dProbability")
+        assert(multipleHere.isFinite, s"multipleHere = $multipleHere, d = $d, mProb = $mProb")
         sumP += dProbability * multipleHere
         sumW += dExpectation * multipleHere
 
