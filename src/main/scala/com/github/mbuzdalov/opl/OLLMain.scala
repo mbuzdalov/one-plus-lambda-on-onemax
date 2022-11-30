@@ -45,8 +45,7 @@ object OLLMain {
       val mProb = lambda / n
       val xProb = 1 / lambda
 
-      val logXProb = math.log(xProb)
-      val log1XProb = math.log1p(-xProb)
+      val xOver1X = xProb / (1 - xProb)
 
       val logMProb = math.log(mProb)
       val log1MProb = math.log1p(-mProb)
@@ -91,17 +90,21 @@ object OLLMain {
               dExpectation += pOfThisGInAllMutations * runtimes(x + theFitness)
             } else {
               var goodFlip = 1
+              var p0 = xProb * math.pow(1 - xProb, d - 1) * g
               while (goodFlip <= g) {
                 probOfReachingF(goodFlip) = 0.0
                 val badFlipLimit = math.min(goodFlip - 1, d - g)
                 var badFlip = 0
+                var p = p0
                 while (badFlip <= badFlipLimit) {
-                  val allFlip = goodFlip + badFlip
-                  val p = math.exp(logXProb * allFlip + log1XProb * (d - allFlip) + MathEx.logChoose(g, goodFlip) + MathEx.logChoose(d - g, badFlip))
                   probOfReachingF(goodFlip - badFlip) += p
+                  p *= xOver1X * (d - g - badFlip)
                   badFlip += 1
+                  p /= badFlip
                 }
+                p0 *= xOver1X * (g - goodFlip)
                 goodFlip += 1
+                p0 /= goodFlip
               }
 
               // The remaining probability is for being no better
@@ -184,7 +187,9 @@ object OLLMain {
 
   def main(args: Array[String]): Unit = {
     val n = args(0).toInt
+    val t0 = System.nanoTime()
     val evaluator = new Evaluator(n, debugOutput = true)
     println(s"Total runtime: ${evaluator.totalRuntime}")
+    println(s"Time consumed: ${(System.nanoTime() - t0) * 1e-9} s")
   }
 }
