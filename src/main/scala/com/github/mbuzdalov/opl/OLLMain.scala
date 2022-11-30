@@ -1,18 +1,21 @@
 package com.github.mbuzdalov.opl
 
+import java.io.{FileOutputStream, PrintWriter}
 import java.util.concurrent.{Callable, ScheduledThreadPoolExecutor}
 
 object OLLMain {
   class Evaluator(n: Int,
                   neverMutateZeroBits: Boolean,
                   includeBestMutantInComparison: Boolean,
-                  debugOutput: Boolean) {
+                  output: Option[String]) {
     val lambdas: Array[Int] = Array.ofDim[Int](n + 1)
     val runtimes: Array[Double] = Array.ofDim[Double](n + 1)
     val totalRuntime: Double = {
       runtimes(n) = 0.0
 
       val pool = new ScheduledThreadPoolExecutor(Runtime.getRuntime.availableProcessors())
+      val pw = output.map(name => new PrintWriter(new FileOutputStream(name), true))
+      pw.foreach(_.println("fitness,best-lambda,runtime-to-optimum,runtime-to-optimum-for-lambda-one"))
 
       var theTotalRuntime = 0.0
       var x = n
@@ -42,13 +45,11 @@ object OLLMain {
         runtimes(x) = bestValue
         lambdas(x) = bestLambda
 
-        if (debugOutput) {
-          println(s"$x => lambda=$bestLambda, value=$bestValue, value at 1=$valueAt1")
-        }
-
+        pw.foreach(_.println(s"$x,$bestLambda,$bestValue,$valueAt1"))
         theTotalRuntime += bestValue * math.exp(MathEx.logChoose(n, x) - math.log(2) * n)
       }
 
+      pw.foreach(_.close())
       pool.shutdown()
       theTotalRuntime
     }
@@ -218,12 +219,15 @@ object OLLMain {
 
   def main(args: Array[String]): Unit = {
     val n = args(0).toInt
+    val printSummary = getBooleanOption(args, "print-summary")
     val t0 = System.nanoTime()
     val evaluator = new Evaluator(n,
       neverMutateZeroBits = getBooleanOption(args, "never-mutate-zero-bits"),
       includeBestMutantInComparison = getBooleanOption(args, "include-best-mutant"),
-      debugOutput = getBooleanOption(args, "debug-output"))
-    println(s"Total runtime: ${evaluator.totalRuntime}")
-    println(s"Time consumed: ${(System.nanoTime() - t0) * 1e-9} s")
+      output = args.find(_.startsWith("--output=")).map(_.substring("--output=".length)))
+    if (printSummary) {
+      println(s"Total runtime: ${evaluator.totalRuntime}")
+      println(s"Time consumed: ${(System.nanoTime() - t0) * 1e-9} s")
+    }
   }
 }
