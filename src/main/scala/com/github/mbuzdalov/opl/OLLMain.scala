@@ -1,5 +1,7 @@
 package com.github.mbuzdalov.opl
 
+import java.util.concurrent.{Callable, ScheduledThreadPoolExecutor}
+
 object OLLMain {
   class Evaluator(n: Int,
                   neverMutateZeroBits: Boolean,
@@ -10,6 +12,8 @@ object OLLMain {
     val totalRuntime: Double = {
       runtimes(n) = 0.0
 
+      val pool = new ScheduledThreadPoolExecutor(Runtime.getRuntime.availableProcessors())
+
       var theTotalRuntime = 0.0
       var x = n
       while (x > 0) {
@@ -17,10 +21,16 @@ object OLLMain {
         // Choosing best discrete lambda
         var bestLambda = 0
         var bestValue = Double.PositiveInfinity
+
+        val tasks = new java.util.ArrayList[Callable[Double]](n)
+        for (lambda <- 1 to n) {
+          tasks.add(() => findRuntime(x, lambda))
+        }
+        val futures = pool.invokeAll(tasks)
+
         var valueAt1 = Double.NaN
-        var lambda = 1
-        while (lambda <= n) {
-          val value = findRuntime(x, lambda)
+        for (lambda <- 1 to n) {
+          val value = futures.get(lambda - 1).get()
           if (value < bestValue) {
             bestValue = value
             bestLambda = lambda
@@ -28,7 +38,6 @@ object OLLMain {
           if (lambda == 1) {
             valueAt1 = value
           }
-          lambda += 1
         }
         runtimes(x) = bestValue
         lambdas(x) = bestLambda
@@ -39,6 +48,8 @@ object OLLMain {
 
         theTotalRuntime += bestValue * math.exp(MathEx.logChoose(n, x) - math.log(2) * n)
       }
+
+      pool.shutdown()
       theTotalRuntime
     }
 
