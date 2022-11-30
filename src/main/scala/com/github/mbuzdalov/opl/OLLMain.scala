@@ -202,14 +202,21 @@ object OLLMain {
     }
   }
 
+  private def getBooleanOption(args: Array[String], name: String): Boolean = {
+    val prefix = "--" + name + "="
+    args.find(_.startsWith(prefix)) match {
+      case Some(arg) => arg.substring(prefix.length).toBoolean
+      case None => throw new IllegalArgumentException(s"No option --$name is given (expected either ${prefix}true or ${prefix}false")
+    }
+  }
 
   def main(args: Array[String]): Unit = {
     val n = args(0).toInt
     val t0 = System.nanoTime()
     val evaluator = new Evaluator(n,
-      neverMutateZeroBits = true,
-      includeBestMutantInComparison = false,
-      debugOutput = true)
+      neverMutateZeroBits = getBooleanOption(args, "never-mutate-zero-bits"),
+      includeBestMutantInComparison = getBooleanOption(args, "include-best-mutant"),
+      debugOutput = getBooleanOption(args, "debug-output"))
     println(s"Total runtime: ${evaluator.totalRuntime}")
     println(s"Time consumed: ${(System.nanoTime() - t0) * 1e-9} s")
   }
