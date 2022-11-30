@@ -19,15 +19,11 @@ object OLLMain {
         var bestValue = Double.PositiveInfinity
         var valueAt1 = Double.NaN
         var lambda = 1
-        var worseInARow = 0
         while (lambda <= n) {
-          val value = findRuntime(x, runtimes, lambda)
+          val value = findRuntime(x, lambda)
           if (value < bestValue) {
             bestValue = value
             bestLambda = lambda
-          }
-          if (value > bestValue) {
-            worseInARow += 1
           }
           if (lambda == 1) {
             valueAt1 = value
@@ -46,8 +42,7 @@ object OLLMain {
       theTotalRuntime
     }
 
-
-    private def findRuntime(x: Int, runtimes: Array[Double], lambda: Double): Double = {
+    private def findRuntime(x: Int, lambda: Double): Double = {
       val popSize = math.round(lambda).toInt
       val mProb = lambda / n
       val xProb = 1 / lambda
