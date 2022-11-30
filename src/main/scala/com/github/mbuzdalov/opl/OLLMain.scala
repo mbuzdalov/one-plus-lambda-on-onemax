@@ -7,6 +7,7 @@ object OLLMain {
   class Evaluator(n: Int,
                   neverMutateZeroBits: Boolean,
                   includeBestMutantInComparison: Boolean,
+                  ignoreCrossoverParentDuplicates: Boolean,
                   output: Option[String]) {
     val lambdas: Array[Int] = Array.ofDim[Int](n + 1)
     val runtimes: Array[Double] = Array.ofDim[Double](n + 1)
@@ -18,6 +19,7 @@ object OLLMain {
       pw.foreach(_.print(s"""# n=$n
                             |# --never-mutate-zero-bits=$neverMutateZeroBits
                             |# --include-best-mutant=$includeBestMutantInComparison
+                            |# --ignore-crossover-parent-duplicates=$ignoreCrossoverParentDuplicates
                             |fitness,best-lambda,runtime-to-optimum,runtime-to-optimum-for-lambda-one
                             |""".stripMargin))
 
@@ -69,17 +71,28 @@ object OLLMain {
       val log1MProb = math.log1p(-mProb)
 
       var sumW, sumP = 0.0
+      var expectedPopSize = 0.0
       val probOfReachingF = Array.ofDim[Double](n + 1)
 
-      // neverMutateZeroBits: since this influences only the cases where we mutate nothing,
-      // we account for it by dividing the probability of success by 1-(1-mProb)^n.
+      // neverMutateZeroBits #1: we divide the probability of flipping exactly d bits by 1-(1-mProb)^n.
       val mutationScale = if (neverMutateZeroBits)
         1 / (1 - math.exp(n * log1MProb))
       else 1
 
+      // neverMutateZeroBits #2: the expected population size needs to take into account d = 0
+      if (!neverMutateZeroBits) {
+        val probability = math.exp(n * log1MProb)
+        if (ignoreCrossoverParentDuplicates) {
+          expectedPopSize += probability * popSize // all mutations happen, all crossovers ignored
+        } else {
+          expectedPopSize += probability * 2 * popSize // all mutations happen, all crossovers happen
+        }
+      }
+
       // All that we do we condition on the distance between the parent and offspring.
       var d = 1
       while (d <= n) {
+
         // The maximum number of good bits to be flipped
         val maxG = math.min(d, n - x)
         var dProbability, dExpectation = 0.0
@@ -199,6 +212,13 @@ object OLLMain {
         sumP += dProbability * multipleHere
         sumW += dExpectation * multipleHere
 
+        // ignoreCrossoverParentDuplicates: seems that influences only the expected iteration size
+        val expectedIterationSize = if (ignoreCrossoverParentDuplicates) {
+          popSize + popSize * (1 - math.pow(xProb, d) - math.pow(1 - xProb, d))
+        } else 2.0 * popSize
+
+        expectedPopSize += expectedIterationSize * multipleHere
+
         d += 1
       }
 
@@ -209,7 +229,7 @@ object OLLMain {
 
       // The final result is straightforward: we wait until success, then go the chosen way,
       // assuming we spend 2 * popSize in each iteration
-      (sumW + 2 * popSize) / sumP
+      (sumW + expectedPopSize) / sumP
     }
   }
 
@@ -228,6 +248,7 @@ object OLLMain {
     val evaluator = new Evaluator(n,
       neverMutateZeroBits = getBooleanOption(args, "never-mutate-zero-bits"),
       includeBestMutantInComparison = getBooleanOption(args, "include-best-mutant"),
+      ignoreCrossoverParentDuplicates = getBooleanOption(args, "ignore-crossover-parent-duplicates"),
       output = args.find(_.startsWith("--output=")).map(_.substring("--output=".length)))
     if (printSummary) {
       println(s"Total runtime: ${evaluator.totalRuntime}")
