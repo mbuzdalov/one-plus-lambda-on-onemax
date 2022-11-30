@@ -84,72 +84,74 @@ object OLLMain {
           val pOfThisGInAllMutations = if (popSize > 1) math.pow(newDCumulativeSum, popSize) - math.pow(dCumulativeSum, popSize) else pOfThisGInSingleMutation
           dCumulativeSum = newDCumulativeSum
 
-          if (pOfThisGInAllMutations > 0) {
+          if (pOfThisGInAllMutations > 0 && (xProb < 1 || g > d - g)) {
             // Filling the probability of reaching a fitness (probOfReachingF(i) corresponds to fitness x + i)
             // in one application of crossover
-            var goodFlip = 0
-            while (goodFlip < g) {
-              goodFlip += 1
-              probOfReachingF(goodFlip) = 0.0
-              val badFlipLimit = math.min(goodFlip - 1, d - g)
-              var badFlip = -1
-              while (badFlip < badFlipLimit) {
-                badFlip += 1
-                val allFlip = goodFlip + badFlip
-                if (allFlip <= d) {
-                  val p = if (allFlip == d)
-                    math.exp(logXProb * allFlip + MathEx.logChoose(g, goodFlip) + MathEx.logChoose(d - g, badFlip))
-                  else
-                    math.exp(logXProb * allFlip + log1XProb * (d - allFlip) + MathEx.logChoose(g, goodFlip) + MathEx.logChoose(d - g, badFlip))
+            if (xProb == 1) {
+              // Everything is flipped. This is a special quick case, as only one possible offspring is generated
+              val theFitness = g - (d - g)
+              dProbability += pOfThisGInAllMutations
+              dExpectation += pOfThisGInAllMutations * runtimes(x + theFitness)
+            } else {
+              var goodFlip = 0
+              while (goodFlip < g) {
+                goodFlip += 1
+                probOfReachingF(goodFlip) = 0.0
+                val badFlipLimit = math.min(goodFlip - 1, d - g)
+                var badFlip = -1
+                while (badFlip < badFlipLimit) {
+                  badFlip += 1
+                  val allFlip = goodFlip + badFlip
+                  val p = math.exp(logXProb * allFlip + log1XProb * (d - allFlip) + MathEx.logChoose(g, goodFlip) + MathEx.logChoose(d - g, badFlip))
                   probOfReachingF(goodFlip - badFlip) += p
                 }
               }
-            }
 
-            // The remaining probability is for being no better
-            var probOfReachingFSum = 0.0
+              // The remaining probability is for being no better
+              var probOfReachingFSum = 0.0
 
-            {
-              var i = 0
-              while (i < g) {
-                i += 1
-                probOfReachingFSum += probOfReachingF(i)
+              {
+                var i = 0
+                while (i < g) {
+                  i += 1
+                  probOfReachingFSum += probOfReachingF(i)
+                }
               }
-            }
-            probOfReachingF(0) = 1.0 - probOfReachingFSum
-            if (probOfReachingF(0) < 0) {
-              assert(probOfReachingF(0) >= -1e-9)
-              probOfReachingF(0) = 0
-            }
-
-            // The above was for one application of crossover. Now it's time to use popSize
-            if (popSize > 1) {
-              var sum = 0.0
-              var i = -1
-              probOfReachingFSum = 0
-              while (i < g) {
-                i += 1
-                val newSum = sum + probOfReachingF(i)
-                probOfReachingF(i) = math.pow(newSum, popSize) - math.pow(sum, popSize)
-                probOfReachingFSum += probOfReachingF(i)
-                sum = newSum
+              probOfReachingF(0) = 1.0 - probOfReachingFSum
+              if (probOfReachingF(0) < 0) {
+                assert(probOfReachingF(0) >= -1e-9)
+                probOfReachingF(0) = 0
               }
 
-              assert(math.abs(1 - sum) < 1e-9, "Total probability is not 1")
-              assert(math.abs(1 - probOfReachingFSum) < 1e-9, "Population sizing fails")
-            }
+              // The above was for one application of crossover. Now it's time to use popSize
+              if (popSize > 1) {
+                var sum = 0.0
+                var i = -1
+                probOfReachingFSum = 0
+                while (i < g) {
+                  i += 1
+                  val newSum = sum + probOfReachingF(i)
+                  probOfReachingF(i) = math.pow(newSum, popSize) - math.pow(sum, popSize)
+                  probOfReachingFSum += probOfReachingF(i)
+                  sum = newSum
+                }
 
-            // Finally, compute the remaining time & probability, given g
-            {
-              var i = 0
-              var xProbOfImprovement, xRemainingTime = 0.0
-              while (i < g) {
-                i += 1
-                xProbOfImprovement += probOfReachingF(i)
-                xRemainingTime += probOfReachingF(i) * runtimes(x + i)
+                assert(math.abs(1 - sum) < 1e-9, "Total probability is not 1")
+                assert(math.abs(1 - probOfReachingFSum) < 1e-9, "Population sizing fails")
               }
-              dProbability += pOfThisGInAllMutations * xProbOfImprovement
-              dExpectation += pOfThisGInAllMutations * xRemainingTime
+
+              // Finally, compute the remaining time & probability, given g
+              {
+                var i = 0
+                var xProbOfImprovement, xRemainingTime = 0.0
+                while (i < g) {
+                  i += 1
+                  xProbOfImprovement += probOfReachingF(i)
+                  xRemainingTime += probOfReachingF(i) * runtimes(x + i)
+                }
+                dProbability += pOfThisGInAllMutations * xProbOfImprovement
+                dExpectation += pOfThisGInAllMutations * xRemainingTime
+              }
             }
           }
         }
