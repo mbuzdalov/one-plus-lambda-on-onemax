@@ -14,10 +14,9 @@ object OLLMain {
         // Choosing best discrete lambda
         var bestLambda = 0
         var bestValue = Double.PositiveInfinity
-        var lambda = 0
         var valueAt1 = Double.NaN
-        while (lambda < n) {
-          lambda += 1
+        var lambda = 1
+        while (lambda <= n) {
           val value = findRuntime(x, runtimes, lambda)
           if (value < bestValue) {
             bestValue = value
@@ -26,6 +25,7 @@ object OLLMain {
           if (lambda == 1) {
             valueAt1 = value
           }
+          lambda += 1
         }
         runtimes(x) = bestValue
         lambdas(x) = bestLambda
@@ -55,9 +55,8 @@ object OLLMain {
       val probOfReachingF = Array.ofDim[Double](n + 1)
 
       // All that we do we condition on the distance between the parent and offspring.
-      var d = 0
-      while (d < n) {
-        d += 1
+      var d = 1
+      while (d <= n) {
         // The maximum number of good bits to be flipped
         val maxG = math.min(d, n - x)
         var dProbability, dExpectation = 0.0
@@ -71,10 +70,8 @@ object OLLMain {
         // reaching fitness f from parent fitness x and "crossover probability" xProb
         // is possible when flipping f-x+i "good" bits and i "bad" bits for all possible i.
         // The probability is choose(g, f - x + i) * choose(d - g, i) * xProb^(f - x + 2 * i) * (1 - xProb)^(d - (f - x + 2 * i))
-        var g = 0
-        while (g < maxG) {
-          g += 1
-
+        var g = 1
+        while (g <= maxG) {
           // In mutation, the offspring with most good bits flipped wins.
           // We know we flipped d bits, and there are x bad bits and n-x good bits.
           // In one run, the probability to flip g good bits is choose(n-x, g) * choose(x, d-g) / choose(n, d)
@@ -93,28 +90,28 @@ object OLLMain {
               dProbability += pOfThisGInAllMutations
               dExpectation += pOfThisGInAllMutations * runtimes(x + theFitness)
             } else {
-              var goodFlip = 0
-              while (goodFlip < g) {
-                goodFlip += 1
+              var goodFlip = 1
+              while (goodFlip <= g) {
                 probOfReachingF(goodFlip) = 0.0
                 val badFlipLimit = math.min(goodFlip - 1, d - g)
-                var badFlip = -1
-                while (badFlip < badFlipLimit) {
-                  badFlip += 1
+                var badFlip = 0
+                while (badFlip <= badFlipLimit) {
                   val allFlip = goodFlip + badFlip
                   val p = math.exp(logXProb * allFlip + log1XProb * (d - allFlip) + MathEx.logChoose(g, goodFlip) + MathEx.logChoose(d - g, badFlip))
                   probOfReachingF(goodFlip - badFlip) += p
+                  badFlip += 1
                 }
+                goodFlip += 1
               }
 
               // The remaining probability is for being no better
               var probOfReachingFSum = 0.0
 
               {
-                var i = 0
-                while (i < g) {
-                  i += 1
+                var i = 1
+                while (i <= g) {
                   probOfReachingFSum += probOfReachingF(i)
+                  i += 1
                 }
               }
               probOfReachingF(0) = 1.0 - probOfReachingFSum
@@ -126,14 +123,14 @@ object OLLMain {
               // The above was for one application of crossover. Now it's time to use popSize
               if (popSize > 1) {
                 var sum = 0.0
-                var i = -1
                 probOfReachingFSum = 0
-                while (i < g) {
-                  i += 1
+                var i = 0
+                while (i <= g) {
                   val newSum = sum + probOfReachingF(i)
                   probOfReachingF(i) = math.pow(newSum, popSize) - math.pow(sum, popSize)
                   probOfReachingFSum += probOfReachingF(i)
                   sum = newSum
+                  i += 1
                 }
 
                 assert(math.abs(1 - sum) < 1e-9, "Total probability is not 1")
@@ -142,18 +139,20 @@ object OLLMain {
 
               // Finally, compute the remaining time & probability, given g
               {
-                var i = 0
                 var xProbOfImprovement, xRemainingTime = 0.0
-                while (i < g) {
-                  i += 1
+                var i = 1
+                while (i <= g) {
                   xProbOfImprovement += probOfReachingF(i)
                   xRemainingTime += probOfReachingF(i) * runtimes(x + i)
+                  i += 1
                 }
                 dProbability += pOfThisGInAllMutations * xProbOfImprovement
                 dExpectation += pOfThisGInAllMutations * xRemainingTime
               }
             }
           }
+
+          g += 1
         }
 
         assert(math.abs(1 - dCumulativeSum) < 1e-9, "Total probability is not 1")
@@ -167,6 +166,8 @@ object OLLMain {
         assert(multipleHere.isFinite, s"Shit: multipleHere = $multipleHere, d = $d, mProb = $mProb")
         sumP += dProbability * multipleHere
         sumW += dExpectation * multipleHere
+
+        d += 1
       }
 
       assert(0 <= sumP && sumP <= 1 + 1e-9, s"Something is terribly wrong: sumP = $sumP, x = $x, lambda = $lambda")
