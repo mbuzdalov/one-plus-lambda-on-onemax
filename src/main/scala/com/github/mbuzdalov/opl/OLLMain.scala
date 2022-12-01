@@ -276,7 +276,10 @@ object OLLMain {
         d += 1
       }
 
-      assert(0 <= sumP && sumP <= 1 + 1e-9, s"Something is terribly wrong: sumP = $sumP, x = $x, lambda = $lambda")
+      assert(0 <= sumP && sumP <= 1 + 1e-5, s"Something is terribly wrong: sumP = $sumP, x = $x, lambda = $lambda")
+      if (sumP > 1 + 1e-9) {
+        println(s"Warning: sumP = $sumP")
+      }
       if (sumP > 1) {
         sumP = 1
       }
