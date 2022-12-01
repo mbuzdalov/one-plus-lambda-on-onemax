@@ -76,7 +76,7 @@ object OLLMain {
       (x: CacheEntry, y: CacheEntry) => -java.lang.Long.compare(x.g, y.g)
     private val probOfReachingFCache = new scala.collection.mutable.HashMap[CacheEntry, CacheEntry]
     private val cacheEntryQueue = new scala.collection.mutable.PriorityQueue[CacheEntry]()(cacheEntryOrdering)
-    private var cacheByteSize, queries, hits, totalHits, misses, totalMisses = 0L
+    private var cacheByteSize, queries, hits, hitTime, totalHits, misses, missTime, totalMisses = 0L
 
     val lambdas: Array[Int] = Array.ofDim[Int](n + 1)
     val runtimes: Array[Double] = Array.ofDim[Double](n + 1)
@@ -156,9 +156,11 @@ object OLLMain {
 
         val realEntry = if (probOfReachingFCache.contains(entry)) {
           hits += 1
+          hitTime += g.toLong * g
           probOfReachingFCache(entry)
         } else {
           misses += 1
+          missTime += g.toLong * g
           tryAddEntry(entry)
           entry
         }
@@ -166,9 +168,11 @@ object OLLMain {
         if (queries % 1000000 == 0) {
           totalHits += hits
           totalMisses += misses
-          println(s"[$queries queries, $totalHits hits ($hits new), $totalMisses misses ($misses new), cache size ${probOfReachingFCache.size}, $cacheByteSize bytes in arrays]")
+          println(s"[$queries queries, $totalHits hits ($hits new, time $hitTime), $totalMisses misses ($misses new, time $missTime), cache size ${probOfReachingFCache.size}, $cacheByteSize bytes in arrays]")
           hits = 0
           misses = 0
+          hitTime = 0
+          missTime = 0
         }
         realEntry
       }.result
