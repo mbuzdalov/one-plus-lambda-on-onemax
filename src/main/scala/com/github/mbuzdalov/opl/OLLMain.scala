@@ -78,8 +78,8 @@ object OLLMain {
     private val cacheEntryQueue = new scala.collection.mutable.PriorityQueue[CacheEntry]()(cacheEntryOrdering)
     private var cacheByteSize, queries, hits, hitTime, totalHits, misses, missTime, totalMisses = 0L
 
-    val lambdas: Array[Int] = Array.ofDim[Int](n + 1)
-    val runtimes: Array[Double] = Array.ofDim[Double](n + 1)
+    private val lambdas: Array[Int] = Array.ofDim[Int](n + 1)
+    private val runtimes: Array[Double] = Array.ofDim[Double](n + 1)
     val totalRuntime: Double = {
       runtimes(n) = 0.0
 
@@ -236,7 +236,7 @@ object OLLMain {
             // Filling the probability of reaching a fitness (probOfReachingF(i) corresponds to fitness x + i)
             // in one application of crossover
             if (xProb == 1) {
-              // Everything is flipped, so we basically consider the best offspring.
+              // Everything is flipped, so we basically consider the best mutant.
               // This is a special quick case, as only one possible offspring is generated
               val theFitness = g - (d - g)
               dProbability += pOfThisGInAllMutations
