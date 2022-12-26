@@ -18,6 +18,13 @@ object OLLMain {
       lazy val result: Array[Double] = {
         val probOfReachingF = Array.ofDim[Double](g + 1)
 
+        // In crossover, we evaluate the probability and expected remaining runtime
+        // for each number of "good" bits flipped in the best selected offspring.
+        // If the best offspring has g "good" bits flipped right, and hence d-g bits flipped wrong,
+        // reaching fitness f from parent fitness x and "crossover probability" xProb
+        // is possible when flipping f-x+i "good" bits and i "bad" bits for all possible i.
+        // The probability is choose(g, f - x + i) * choose(d - g, i) * xProb^(f - x + 2 * i) * (1 - xProb)^(d - (f - x + 2 * i))
+
         val xOver1X = xProb / (1 - xProb)
         var goodFlip = 1
         var p0 = xProb * math.pow(1 - xProb, d - 1) * g
@@ -214,13 +221,9 @@ object OLLMain {
         var dCumulativeSum = if (x < d) 0.0 else math.exp(MathEx.logChoose(x, d) - MathEx.logChoose(n, d))
 
         // We need to go from the end: first model the crossover, then mutation atop of it.
+        // Everything about crossover, once d, g, popSize and xProb are fixed, is shared across fitness values
+        // and can be precomputed (or cached), so we do it.
 
-        // In crossover, we evaluate the probability and expected remaining runtime
-        // for each number of "good" bits flipped in the best selected offspring.
-        // If the best offspring has g "good" bits flipped right, and hence d-g bits flipped wrong,
-        // reaching fitness f from parent fitness x and "crossover probability" xProb
-        // is possible when flipping f-x+i "good" bits and i "bad" bits for all possible i.
-        // The probability is choose(g, f - x + i) * choose(d - g, i) * xProb^(f - x + 2 * i) * (1 - xProb)^(d - (f - x + 2 * i))
         var g = 1
         while (g <= maxG) {
           // In mutation, the offspring with most good bits flipped wins.
@@ -233,8 +236,6 @@ object OLLMain {
           dCumulativeSum = newDCumulativeSum
 
           if (pOfThisGInAllMutations > 0 && (xProb < 1 || g > d - g)) {
-            // Filling the probability of reaching a fitness (probOfReachingF(i) corresponds to fitness x + i)
-            // in one application of crossover
             if (xProb == 1) {
               // Everything is flipped, so we basically consider the best mutant.
               // This is a special quick case, as only one possible offspring is generated
@@ -242,6 +243,7 @@ object OLLMain {
               dProbability += pOfThisGInAllMutations
               dExpectation += pOfThisGInAllMutations * runtimes(x + theFitness)
             } else {
+              // Getting the probability of reaching a fitness (probOfReachingF(i) corresponds to fitness x + i)
               val probOfReachingF = computeProbOfReachingF(d, g, popSize, xProb)
               var xProbOfImprovement, xRemainingTime = 0.0
               // includeBestMutantInComparison: we compute the probabilities of getting all fitness values,
@@ -293,7 +295,7 @@ object OLLMain {
       }
 
       // The final result is straightforward: we wait until success, then go the chosen way,
-      // assuming we spend 2 * popSize in each iteration
+      // assuming we spend `expectedPopSize` fitness evaluations in each iteration
       (sumW + expectedPopSize) / sumP
     }
   }
