@@ -55,43 +55,23 @@ object OLLMain {
     }
   }
 
-  private def getBooleanOption(args: Array[String], name: String): Boolean = {
-    val prefix = "--" + name + "="
-    args.find(_.startsWith(prefix)) match {
-      case Some(arg) => arg.substring(prefix.length).toBoolean
-      case None => throw new IllegalArgumentException(s"No option --$name is given (expected either ${prefix}true or ${prefix}false")
-    }
-  }
-
-  //noinspection SameParameterValue
-  private def getLongOption(args: Array[String], name: String): Long = {
-    val prefix = "--" + name + "="
-    args.find(_.startsWith(prefix)) match {
-      case Some(arg) => arg.substring(prefix.length).toLongOption match {
-        case Some(value) => value
-        case None => throw new IllegalArgumentException(s"--$name is not followed by a valid 64-bit integer")
-      }
-      case None => throw new IllegalArgumentException(s"No option --$name is given (expected $prefix<number>")
-    }
-  }
-
   def main(args: Array[String]): Unit = {
     val n = args(0).toInt
-    val printSummary = getBooleanOption(args, "print-summary")
+    val cmd = new CommandLineArgs(args)
+    val printSummary = cmd.getBoolean("print-summary")
     val t0 = System.nanoTime()
 
     val crossoverComputation = new InMemoryCostPrioritizingCrossoverCache(
-      maxCacheByteSize = getLongOption(args, "max-cache-byte-size"),
+      maxCacheByteSize = cmd.getLong("max-cache-byte-size"),
       delegate = CrossoverComputation)
 
     val ollComputation = new OLLComputation(n,
-      neverMutateZeroBits = getBooleanOption(args, "never-mutate-zero-bits"),
-      includeBestMutantInComparison = getBooleanOption(args, "include-best-mutant"),
-      ignoreCrossoverParentDuplicates = getBooleanOption(args, "ignore-crossover-parent-duplicates"),
+      neverMutateZeroBits = cmd.getBoolean("never-mutate-zero-bits"),
+      includeBestMutantInComparison = cmd.getBoolean("include-best-mutant"),
+      ignoreCrossoverParentDuplicates = cmd.getBoolean("ignore-crossover-parent-duplicates"),
       crossoverComputation = crossoverComputation)
 
-    val evaluator = new Evaluator(ollComputation,
-      output = args.find(_.startsWith("--output=")).map(_.substring("--output=".length)))
+    val evaluator = new Evaluator(ollComputation, output = cmd.get("output"))
 
     crossoverComputation.clear()
     if (printSummary) {
