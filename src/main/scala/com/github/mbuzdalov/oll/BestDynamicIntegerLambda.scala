@@ -5,7 +5,7 @@ import java.util.concurrent.{Callable, ScheduledThreadPoolExecutor}
 
 import com.github.mbuzdalov.math.MathEx
 
-object OLLMain {
+object BestDynamicIntegerLambda {
   class Evaluator(ollComputation: OLLComputation,
                   output: Option[String]) {
 
@@ -61,7 +61,8 @@ object OLLMain {
 
     val crossoverComputation = new InMemoryCostPrioritizingCrossoverCache(
       maxCacheByteSize = cmd.getLong("max-cache-byte-size"),
-      delegate = CrossoverComputation)
+      delegate = CrossoverComputation,
+      verbose = true)
 
     val ollComputation = new OLLComputation(n,
       neverMutateZeroBits = cmd.getBoolean("never-mutate-zero-bits"),
@@ -69,7 +70,7 @@ object OLLMain {
       ignoreCrossoverParentDuplicates = cmd.getBoolean("ignore-crossover-parent-duplicates"),
       crossoverComputation = crossoverComputation)
 
-    val evaluator = new Evaluator(ollComputation, output = cmd.get("output"))
+    val evaluator = new Evaluator(ollComputation, output = cmd.getStringOption("output"))
 
     crossoverComputation.clear()
     if (printSummary) {

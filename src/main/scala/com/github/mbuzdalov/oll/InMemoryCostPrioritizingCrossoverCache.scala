@@ -10,7 +10,9 @@ import scala.annotation.tailrec
  * @param maxCacheByteSize the (approximate) maximum size of all the cache entries, in bytes.
  * @param delegate the crossover computation class used to perform the math.
  */
-class InMemoryCostPrioritizingCrossoverCache(maxCacheByteSize: Long, delegate: CrossoverComputation) extends CrossoverComputation {
+class InMemoryCostPrioritizingCrossoverCache(maxCacheByteSize: Long,
+                                             delegate: CrossoverComputation,
+                                             verbose: Boolean) extends CrossoverComputation {
   import InMemoryCostPrioritizingCrossoverCache.CacheEntry
 
   private val entryOrdering: Ordering[CacheEntry] = (x: CacheEntry, y: CacheEntry) => -java.lang.Long.compare(x.g, y.g)
@@ -56,7 +58,9 @@ class InMemoryCostPrioritizingCrossoverCache(maxCacheByteSize: Long, delegate: C
       if (queries % 1000000 == 0) {
         totalHits += hits
         totalMisses += misses
-        println(s"[$queries queries, $totalHits hits ($hits new, cost $hitTime), $totalMisses misses ($misses new, cost $missTime), cache size ${cache.size}, $byteSize bytes in arrays]")
+        if (verbose) {
+          println(s"[$queries queries, $totalHits hits ($hits new, cost $hitTime), $totalMisses misses ($misses new, cost $missTime), cache size ${cache.size}, $byteSize bytes in arrays]")
+        }
         hits = 0
         misses = 0
         hitTime = 0
