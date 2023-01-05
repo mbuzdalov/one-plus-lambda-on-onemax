@@ -1,6 +1,6 @@
 package com.github.mbuzdalov.opl.computation
 
-import com.github.mbuzdalov.opl.MathEx.{logFactorial => lF}
+import com.github.mbuzdalov.math.MathEx.{logFactorial => lF}
 
 trait BareComputationResult {
   def problemSize: Int

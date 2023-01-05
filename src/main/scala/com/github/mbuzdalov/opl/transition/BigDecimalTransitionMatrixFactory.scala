@@ -1,6 +1,6 @@
 package com.github.mbuzdalov.opl.transition
 
-import com.github.mbuzdalov.opl.MathEx.{logFactorialBig => lF}
+import com.github.mbuzdalov.math.MathEx.{logFactorialBig => lF}
 import com.github.mbuzdalov.opl.TransitionMatrix
 import spire.implicits._
 

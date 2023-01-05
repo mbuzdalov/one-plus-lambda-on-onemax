@@ -1,6 +1,6 @@
 package com.github.mbuzdalov.opl.transition
 
-import com.github.mbuzdalov.opl.MathEx.{logFactorial => lF}
+import com.github.mbuzdalov.math.MathEx.{logFactorial => lF}
 import com.github.mbuzdalov.opl.TransitionMatrix
 
 object DoubleTransitionMatrixFactory extends TransitionMatrixFactory {

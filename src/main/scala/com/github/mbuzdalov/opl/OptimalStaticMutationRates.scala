@@ -7,6 +7,7 @@ import javax.imageio.ImageIO
 
 import scala.util.Using
 
+import com.github.mbuzdalov.math.MathEx
 import com.github.mbuzdalov.opl.computation.{BareComputationListener, BareComputationResult, ComputationListener, OptimalRunningTime}
 import com.github.mbuzdalov.opl.distribution.{FlipKBits, ParameterizedDistribution}
 import com.github.mbuzdalov.opl.util.Viridis
@@ -37,19 +38,7 @@ object OptimalStaticMutationRates {
 
   private def singular(n: Int, k: Int): Array[Double] = Array.tabulate(n + 1)(i => if (k == i) 1.0 else 0.0)
 
-  def showFixedTargetTimesForParticularSettings1(): Unit = {
-    val n = 1000
-    val p = 0.0011106
-    val dist = new FixedNonNormalizedDistribution(standard(n, p))
-    println("k,p,t")
-    val listeners = (500 to 1000).map(k => new OptimalRunningTime(n - k).newListener(dist))
-    OnePlusLambda.apply(n, 1, listeners, printTimings = false)
-    for ((k, listener) <- (500 to 1000).lazyZip(listeners)) {
-      println(s"$k,$p,${listener.toResult.expectedRunningTime + 1}")
-    }
-  }
-
-  def rlsWithFixedNumberOfFlips(): Unit = {
+  private def rlsWithFixedNumberOfFlips(): Unit = {
     Using.resource(new PrintWriter("rls-fixed-flips.csv")) { out =>
       val n = 1000
       val flips = Seq(1, 3, 5)
@@ -65,7 +54,7 @@ object OptimalStaticMutationRates {
     }
   }
 
-  def targetStaticRLS(): Unit = {
+  private def targetStaticRLS(): Unit = {
     val n = 1000
     Using.resource(new PrintWriter("rls-target-static.csv")) { out =>
       out.println("k,f,v")
@@ -81,7 +70,7 @@ object OptimalStaticMutationRates {
     }
   }
 
-  def optimalDynamicRLS(): Unit = {
+  private def optimalDynamicRLS(): Unit = {
     val n = 1000
     Using.resource(new PrintWriter("rls-optimal-dynamic.csv")) { out =>
       val listener = OptimalRunningTime.newListener(FlipKBits)
@@ -94,7 +83,7 @@ object OptimalStaticMutationRates {
     }
   }
 
-  def targetDynamicRLS(): Unit = {
+  private def targetDynamicRLS(): Unit = {
     val n = 1000
     Using.resource(new PrintWriter("rls-target-dynamic.csv")) { out =>
       val targets = Seq(550, 570, 590, 610, 630, 650, 1000)
@@ -116,7 +105,7 @@ object OptimalStaticMutationRates {
     }
   }
 
-  def pictureTargetDynamicRLS(): Unit = {
+  private def pictureTargetDynamicRLS(): Unit = {
     val n = 1000
     val vMax = 670
 
@@ -151,7 +140,7 @@ object OptimalStaticMutationRates {
     heatmapOut.close()
   }
 
-  def eaWithStaticParameters(): Unit = {
+  private def eaWithStaticParameters(): Unit = {
     val n = 1000
     class Task(val target: Int) {
       private[this] var left = 0.0

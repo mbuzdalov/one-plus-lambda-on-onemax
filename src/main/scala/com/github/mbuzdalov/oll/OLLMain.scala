@@ -1,9 +1,11 @@
-package com.github.mbuzdalov.opl
+package com.github.mbuzdalov.oll
 
 import java.io.{FileOutputStream, PrintWriter}
 import java.util.concurrent.{Callable, ScheduledThreadPoolExecutor}
 
 import scala.annotation.tailrec
+
+import com.github.mbuzdalov.math.MathEx
 
 object OLLMain {
   class Evaluator(n: Int,

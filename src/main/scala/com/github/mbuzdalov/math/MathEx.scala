@@ -1,4 +1,4 @@
-package com.github.mbuzdalov.opl
+package com.github.mbuzdalov.math
 
 import java.math.{MathContext, RoundingMode}
 import java.{util => ju}
@@ -26,7 +26,7 @@ object MathEx {
     }
   }
 
-  final val bigLogFactorialContext = new MathContext(40, RoundingMode.HALF_EVEN)
+  private[this] final val bigLogFactorialContext = new MathContext(40, RoundingMode.HALF_EVEN)
   private[this] val bdLogFactorialCache = new ju.ArrayList[BigDecimal](2)
   bdLogFactorialCache.add(BigDecimal.decimal(0, bigLogFactorialContext))
   bdLogFactorialCache.add(bdLogFactorialCache.get(0))

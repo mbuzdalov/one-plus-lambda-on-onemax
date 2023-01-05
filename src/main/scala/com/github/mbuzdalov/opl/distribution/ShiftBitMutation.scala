@@ -1,7 +1,7 @@
 package com.github.mbuzdalov.opl.distribution
 
+import com.github.mbuzdalov.math.MathEx.{logFactorial => lF}
 import com.github.mbuzdalov.opl.DoubleProbabilityVector
-import com.github.mbuzdalov.opl.MathEx.{logFactorial => lF}
 import com.github.mbuzdalov.opl.util.NumericMinimization
 
 object ShiftBitMutation extends ParameterizedDistribution[Double] {
