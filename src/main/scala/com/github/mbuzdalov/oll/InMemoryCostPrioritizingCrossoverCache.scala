@@ -77,7 +77,7 @@ object InMemoryCostPrioritizingCrossoverCache {
 
     def byteSize: Int = (g + 5) * 8
 
-    def result(delegate: CrossoverComputation): Array[Double] = {
+    def result(delegate: CrossoverComputation): Array[Double] = synchronized {
       if (cachedResult == null) {
         cachedResult = delegate.compute(d, g, popSize, xProb)
       }
