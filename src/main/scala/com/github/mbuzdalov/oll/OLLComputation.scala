@@ -1,5 +1,7 @@
 package com.github.mbuzdalov.oll
 
+import java.io.PrintWriter
+
 import com.github.mbuzdalov.math.MathEx
 
 /**
@@ -14,11 +16,11 @@ import com.github.mbuzdalov.math.MathEx
  *                                        towards the total count of fitness function evaluations,
  * @param crossoverComputation the particular object to be used for computing the crossover transition probabilities.
  */
-class OLLComputation(n: Int,
-                     neverMutateZeroBits: Boolean,
-                     includeBestMutantInComparison: Boolean,
-                     ignoreCrossoverParentDuplicates: Boolean,
-                     crossoverComputation: CrossoverComputation) {
+class OLLComputation(val n: Int,
+                     val neverMutateZeroBits: Boolean,
+                     val includeBestMutantInComparison: Boolean,
+                     val ignoreCrossoverParentDuplicates: Boolean,
+                     val crossoverComputation: CrossoverComputation) {
   /**
    * Finds the runtime assuming the parent's fitness, the value of lambda, and the runtimes for all higher fitness
    * values are given.
@@ -140,5 +142,13 @@ class OLLComputation(n: Int,
     // The final result is straightforward: we wait until success, then go the chosen way,
     // assuming we spend `expectedPopSize` fitness evaluations in each iteration
     (sumW + expectedPopSize) / sumP
+  }
+
+  def logConfiguration(out: PrintWriter): Unit = {
+    out.print(s"""# n=$n
+                 |# --never-mutate-zero-bits=$neverMutateZeroBits
+                 |# --include-best-mutant=$includeBestMutantInComparison
+                 |# --ignore-crossover-parent-duplicates=$ignoreCrossoverParentDuplicates
+                 |""".stripMargin)
   }
 }

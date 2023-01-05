@@ -6,29 +6,20 @@ import java.util.concurrent.{Callable, ScheduledThreadPoolExecutor}
 import com.github.mbuzdalov.math.MathEx
 
 object OLLMain {
-  class Evaluator(n: Int,
-                  neverMutateZeroBits: Boolean,
-                  includeBestMutantInComparison: Boolean,
-                  ignoreCrossoverParentDuplicates: Boolean,
-                  maxCacheByteSize: Long,
+  class Evaluator(ollComputation: OLLComputation,
                   output: Option[String]) {
 
+    private val n = ollComputation.n
     private val lambdas: Array[Int] = Array.ofDim[Int](n + 1)
     private val runtimes: Array[Double] = Array.ofDim[Double](n + 1)
-    private val crossoverComputation = new InMemoryCostPrioritizingCrossoverCache(maxCacheByteSize, CrossoverComputation)
-    private val ollComputation = new OLLComputation(n, neverMutateZeroBits, includeBestMutantInComparison, ignoreCrossoverParentDuplicates, crossoverComputation)
 
     val totalRuntime: Double = {
       runtimes(n) = 0.0
 
       val pool = new ScheduledThreadPoolExecutor(Runtime.getRuntime.availableProcessors())
       val pw = output.map(name => new PrintWriter(new FileOutputStream(name), true))
-      pw.foreach(_.print(s"""# n=$n
-                            |# --never-mutate-zero-bits=$neverMutateZeroBits
-                            |# --include-best-mutant=$includeBestMutantInComparison
-                            |# --ignore-crossover-parent-duplicates=$ignoreCrossoverParentDuplicates
-                            |fitness,best-lambda,runtime-to-optimum
-                            |""".stripMargin))
+      pw.foreach(ollComputation.logConfiguration)
+      pw.foreach(_.println("fitness,best-lambda,runtime-to-optimum"))
 
       var theTotalRuntime = 0.0
       var x = n
@@ -62,9 +53,6 @@ object OLLMain {
       pool.shutdown()
       theTotalRuntime
     }
-
-    crossoverComputation.clear()
-
   }
 
   private def getBooleanOption(args: Array[String], name: String): Boolean = {
@@ -91,12 +79,21 @@ object OLLMain {
     val n = args(0).toInt
     val printSummary = getBooleanOption(args, "print-summary")
     val t0 = System.nanoTime()
-    val evaluator = new Evaluator(n,
+
+    val crossoverComputation = new InMemoryCostPrioritizingCrossoverCache(
+      maxCacheByteSize = getLongOption(args, "max-cache-byte-size"),
+      delegate = CrossoverComputation)
+
+    val ollComputation = new OLLComputation(n,
       neverMutateZeroBits = getBooleanOption(args, "never-mutate-zero-bits"),
       includeBestMutantInComparison = getBooleanOption(args, "include-best-mutant"),
       ignoreCrossoverParentDuplicates = getBooleanOption(args, "ignore-crossover-parent-duplicates"),
-      maxCacheByteSize = getLongOption(args, "max-cache-byte-size"),
+      crossoverComputation = crossoverComputation)
+
+    val evaluator = new Evaluator(ollComputation,
       output = args.find(_.startsWith("--output=")).map(_.substring("--output=".length)))
+
+    crossoverComputation.clear()
     if (printSummary) {
       println(s"Total runtime: ${evaluator.totalRuntime}")
       println(s"Time consumed: ${(System.nanoTime() - t0) * 1e-9} s")
