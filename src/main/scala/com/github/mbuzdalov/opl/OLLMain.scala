@@ -96,7 +96,7 @@ object OLLMain {
                             |# --never-mutate-zero-bits=$neverMutateZeroBits
                             |# --include-best-mutant=$includeBestMutantInComparison
                             |# --ignore-crossover-parent-duplicates=$ignoreCrossoverParentDuplicates
-                            |fitness,best-lambda,runtime-to-optimum,runtime-to-optimum-for-lambda-one
+                            |fitness,best-lambda,runtime-to-optimum
                             |""".stripMargin))
 
       var theTotalRuntime = 0.0
@@ -113,21 +113,17 @@ object OLLMain {
         }
         val futures = pool.invokeAll(tasks)
 
-        var valueAt1 = Double.NaN
         for (lambda <- 1 to n) {
           val value = futures.get(lambda - 1).get()
           if (value < bestValue) {
             bestValue = value
             bestLambda = lambda
           }
-          if (lambda == 1) {
-            valueAt1 = value
-          }
         }
         runtimes(x) = bestValue
         lambdas(x) = bestLambda
 
-        pw.foreach(_.println(s"$x,$bestLambda,$bestValue,$valueAt1"))
+        pw.foreach(_.println(s"$x,$bestLambda,$bestValue"))
         theTotalRuntime += bestValue * math.exp(MathEx.logChoose(n, x) - math.log(2) * n)
       }
 
