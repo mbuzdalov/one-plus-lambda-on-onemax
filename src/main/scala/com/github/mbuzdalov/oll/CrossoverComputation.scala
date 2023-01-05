@@ -24,6 +24,11 @@ trait CrossoverComputation {
    * @return the array of probabilities, where the i-th element means the probability of increasing the parent's fitness by i.
    */
   def compute(distanceToParent: Int, goodBitsInDifference: Int, populationSize: Int, crossoverBias: Double): Array[Double]
+
+  /**
+   * Cleans up all the resources used by the object.
+   */
+  def clear(): Unit
 }
 
 /**
@@ -103,4 +108,9 @@ object CrossoverComputation extends CrossoverComputation {
 
     probOfReachingF
   }
+
+  /**
+   * Cleans up all the resources used by the object. Does nothing in this stateless implementation.
+   */
+  override def clear(): Unit = {}
 }

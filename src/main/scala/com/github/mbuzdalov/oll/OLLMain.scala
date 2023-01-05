@@ -3,8 +3,6 @@ package com.github.mbuzdalov.oll
 import java.io.{FileOutputStream, PrintWriter}
 import java.util.concurrent.{Callable, ScheduledThreadPoolExecutor}
 
-import scala.annotation.tailrec
-
 import com.github.mbuzdalov.math.MathEx
 
 object OLLMain {
@@ -14,19 +12,11 @@ object OLLMain {
                   ignoreCrossoverParentDuplicates: Boolean,
                   maxCacheByteSize: Long,
                   output: Option[String]) {
-    private case class CacheEntry(d: Int, g: Int, popSize: Int, xProb: Double) {
-      def byteSize: Int = (g + 5) * 8
-      lazy val result: Array[Double] = CrossoverComputation.compute(d, g, popSize, xProb)
-    }
-
-    private val cacheEntryOrdering: Ordering[CacheEntry] =
-      (x: CacheEntry, y: CacheEntry) => -java.lang.Long.compare(x.g, y.g)
-    private val probOfReachingFCache = new scala.collection.mutable.HashMap[CacheEntry, CacheEntry]
-    private val cacheEntryQueue = new scala.collection.mutable.PriorityQueue[CacheEntry]()(cacheEntryOrdering)
-    private var cacheByteSize, queries, hits, hitTime, totalHits, misses, missTime, totalMisses = 0L
 
     private val lambdas: Array[Int] = Array.ofDim[Int](n + 1)
     private val runtimes: Array[Double] = Array.ofDim[Double](n + 1)
+    private val crossoverComputation = new InMemoryCostPrioritizingCrossoverCache(maxCacheByteSize, CrossoverComputation)
+
     val totalRuntime: Double = {
       runtimes(n) = 0.0
 
@@ -71,55 +61,8 @@ object OLLMain {
       pool.shutdown()
       theTotalRuntime
     }
-    probOfReachingFCache.clear()
 
-
-    @tailrec
-    private def tryAddEntry(e: CacheEntry): Unit = {
-      val newCacheByteSize = cacheByteSize + e.byteSize
-      if (newCacheByteSize <= maxCacheByteSize) {
-        probOfReachingFCache.put(e, e)
-        cacheEntryQueue.addOne(e)
-        cacheByteSize = newCacheByteSize
-      } else {
-        val queueTop = cacheEntryQueue.head
-        if (e.g > queueTop.g) {
-          cacheEntryQueue.dequeue()
-          probOfReachingFCache.remove(queueTop)
-          cacheByteSize -= queueTop.byteSize
-          tryAddEntry(e)
-        }
-      }
-    }
-
-    private def computeProbOfReachingF(d: Int, g: Int, popSize: Int, xProb: Double): Array[Double] = {
-      val entry = CacheEntry(d, g, popSize, xProb)
-      probOfReachingFCache.synchronized {
-        assert(probOfReachingFCache.size == cacheEntryQueue.size)
-
-        val realEntry = if (probOfReachingFCache.contains(entry)) {
-          hits += 1
-          hitTime += g.toLong * g
-          probOfReachingFCache(entry)
-        } else {
-          misses += 1
-          missTime += g.toLong * g
-          tryAddEntry(entry)
-          entry
-        }
-        queries += 1
-        if (queries % 1000000 == 0) {
-          totalHits += hits
-          totalMisses += misses
-          println(s"[$queries queries, $totalHits hits ($hits new, time $hitTime), $totalMisses misses ($misses new, time $missTime), cache size ${probOfReachingFCache.size}, $cacheByteSize bytes in arrays]")
-          hits = 0
-          misses = 0
-          hitTime = 0
-          missTime = 0
-        }
-        realEntry
-      }.result
-    }
+    crossoverComputation.clear()
 
     private def findRuntime(x: Int, lambda: Double): Double = {
       val popSize = math.round(lambda).toInt
@@ -180,7 +123,7 @@ object OLLMain {
               dExpectation += pOfThisGInAllMutations * runtimes(x + theFitness)
             } else {
               // Getting the probability of reaching a fitness (probOfReachingF(i) corresponds to fitness x + i)
-              val probOfReachingF = computeProbOfReachingF(d, g, popSize, xProb)
+              val probOfReachingF = crossoverComputation.compute(d, g, popSize, xProb)
               var xProbOfImprovement, xRemainingTime = 0.0
               // includeBestMutantInComparison: we compute the probabilities of getting all fitness values,
               // but for those smaller than the best mutant, which we know, we use the runtime value
