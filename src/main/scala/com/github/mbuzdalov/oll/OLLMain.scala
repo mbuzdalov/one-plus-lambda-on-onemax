@@ -21,7 +21,6 @@ object OLLMain {
       pw.foreach(ollComputation.logConfiguration)
       pw.foreach(_.println("fitness,best-lambda,runtime-to-optimum"))
 
-      var theTotalRuntime = 0.0
       var x = n
       while (x > 0) {
         x -= 1
@@ -46,12 +45,11 @@ object OLLMain {
         lambdas(x) = bestLambda
 
         pw.foreach(_.println(s"$x,$bestLambda,$bestValue"))
-        theTotalRuntime += bestValue * math.exp(MathEx.logChoose(n, x) - math.log(2) * n)
       }
 
       pw.foreach(_.close())
       pool.shutdown()
-      theTotalRuntime
+      MathEx.expectedRuntimeOnBitStrings(n, runtimes)
     }
   }
 

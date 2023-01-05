@@ -64,4 +64,14 @@ object MathEx {
     require(n <= (1 << 30))
     1 << (32 - Integer.numberOfLeadingZeros(n - 1))
   }
+
+  def expectedRuntimeOnBitStrings(n: Int, runtimeForFitnessOrDistance: Int => Double): Double = {
+    var x = 0
+    var theTotalRuntime = 0.0
+    while (x <= n) {
+      theTotalRuntime += runtimeForFitnessOrDistance(x) * math.exp(MathEx.logChoose(n, x) - math.log(2) * n)
+      x += 1
+    }
+    theTotalRuntime
+  }
 }
