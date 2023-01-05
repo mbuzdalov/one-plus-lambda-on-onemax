@@ -16,71 +16,9 @@ object OLLMain {
                   output: Option[String]) {
     private case class CacheEntry(d: Int, g: Int, popSize: Int, xProb: Double) {
       def byteSize: Int = (g + 5) * 8
-
-      lazy val result: Array[Double] = {
-        val probOfReachingF = Array.ofDim[Double](g + 1)
-
-        // In crossover, we evaluate the probability and expected remaining runtime
-        // for each number of "good" bits flipped in the best selected offspring.
-        // If the best offspring has g "good" bits flipped right, and hence d-g bits flipped wrong,
-        // reaching fitness f from parent fitness x and "crossover probability" xProb
-        // is possible when flipping f-x+i "good" bits and i "bad" bits for all possible i.
-        // The probability is choose(g, f - x + i) * choose(d - g, i) * xProb^(f - x + 2 * i) * (1 - xProb)^(d - (f - x + 2 * i))
-
-        val xOver1X = xProb / (1 - xProb)
-        var goodFlip = 1
-        var p0 = xProb * math.pow(1 - xProb, d - 1) * g
-        while (goodFlip <= g) {
-          val badFlipLimit = math.min(goodFlip - 1, d - g)
-          var badFlip = 0
-          var p = p0
-          while (badFlip <= badFlipLimit) {
-            probOfReachingF(goodFlip - badFlip) += p
-            p *= xOver1X * (d - g - badFlip)
-            badFlip += 1
-            p /= badFlip
-          }
-          p0 *= xOver1X * (g - goodFlip)
-          goodFlip += 1
-          p0 /= goodFlip
-        }
-
-        // The remaining probability is for being no better
-        var probOfReachingFSum = 0.0
-
-        {
-          var i = 1
-          while (i <= g) {
-            probOfReachingFSum += probOfReachingF(i)
-            i += 1
-          }
-        }
-        probOfReachingF(0) = 1.0 - probOfReachingFSum
-        if (probOfReachingF(0) < 0) {
-          assert(probOfReachingF(0) >= -1e-9)
-          probOfReachingF(0) = 0
-        }
-
-        // The above was for one application of crossover. Now it's time to use popSize
-        if (popSize > 1) {
-          var sum = 0.0
-          probOfReachingFSum = 0
-          var i = 0
-          while (i <= g) {
-            val newSum = sum + probOfReachingF(i)
-            probOfReachingF(i) = math.pow(newSum, popSize) - math.pow(sum, popSize)
-            probOfReachingFSum += probOfReachingF(i)
-            sum = newSum
-            i += 1
-          }
-
-          assert(math.abs(1 - sum) < 1e-9, "Total probability is not 1")
-          assert(math.abs(1 - probOfReachingFSum) < 1e-9, "Population sizing fails")
-        }
-
-        probOfReachingF
-      }
+      lazy val result: Array[Double] = CrossoverComputation.compute(d, g, popSize, xProb)
     }
+
     private val cacheEntryOrdering: Ordering[CacheEntry] =
       (x: CacheEntry, y: CacheEntry) => -java.lang.Long.compare(x.g, y.g)
     private val probOfReachingFCache = new scala.collection.mutable.HashMap[CacheEntry, CacheEntry]
