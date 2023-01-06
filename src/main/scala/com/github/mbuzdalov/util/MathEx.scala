@@ -1,4 +1,4 @@
-package com.github.mbuzdalov.math
+package com.github.mbuzdalov.util
 
 import java.math.{MathContext, RoundingMode}
 import java.{util => ju}

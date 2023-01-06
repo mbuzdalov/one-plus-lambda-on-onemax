@@ -1,7 +1,7 @@
 package com.github.mbuzdalov.opl.transition
 
-import com.github.mbuzdalov.math.MathEx.{logFactorial => lF}
 import com.github.mbuzdalov.opl.TransitionMatrix
+import com.github.mbuzdalov.util.MathEx.{logFactorial => lF}
 
 object DoubleTransitionMatrixFactory extends TransitionMatrixFactory {
   override def create(n: Int, d: Int): TransitionMatrix = new Implementation(n, d)

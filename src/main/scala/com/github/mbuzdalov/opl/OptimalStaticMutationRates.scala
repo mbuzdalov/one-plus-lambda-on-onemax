@@ -6,11 +6,9 @@ import java.io.{FileOutputStream, PrintWriter}
 import javax.imageio.ImageIO
 
 import scala.util.Using
-
-import com.github.mbuzdalov.math.MathEx
 import com.github.mbuzdalov.opl.computation.{BareComputationListener, BareComputationResult, ComputationListener, OptimalRunningTime}
 import com.github.mbuzdalov.opl.distribution.{FlipKBits, ParameterizedDistribution}
-import com.github.mbuzdalov.opl.util.Viridis
+import com.github.mbuzdalov.util.{MathEx, Viridis}
 
 object OptimalStaticMutationRates {
   private class FixedNonNormalizedDistribution(distribution: Array[Double]) extends ParameterizedDistribution[Unit] {

@@ -1,4 +1,4 @@
-package com.github.mbuzdalov.opl.util
+package com.github.mbuzdalov.util
 
 import java.util.Random
 

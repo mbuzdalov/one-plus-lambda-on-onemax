@@ -4,7 +4,7 @@ import java.util.Random
 
 import scala.io.Source
 
-import com.github.mbuzdalov.math.MathEx
+import com.github.mbuzdalov.util.MathEx
 
 object BestBinnedIntegerLambda {
   def run[T](n: Int, bins: Seq[Int], lambdas: Array[T], ollComputation: OLLComputation)(implicit t2d: T => Double): Double = {

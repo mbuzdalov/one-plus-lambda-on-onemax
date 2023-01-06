@@ -1,8 +1,8 @@
 package com.github.mbuzdalov.opl
 
-import com.github.mbuzdalov.math.MathEx
 import com.github.mbuzdalov.opl.computation.OptimalRunningTime
 import com.github.mbuzdalov.opl.distribution.ParameterizedDistribution
+import com.github.mbuzdalov.util.MathEx
 
 object RuntimesOfAlgorithmsWithStaticDistributions {
   private class FixedNonNormalizedDistribution(distribution: Array[Double]) extends ParameterizedDistribution[Unit] {

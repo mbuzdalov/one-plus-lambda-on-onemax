@@ -3,7 +3,7 @@ package com.github.mbuzdalov.oll
 import java.io.{FileOutputStream, PrintWriter}
 import java.util.concurrent.{Callable, ScheduledThreadPoolExecutor}
 
-import com.github.mbuzdalov.math.MathEx
+import com.github.mbuzdalov.util.MathEx
 
 object BestDynamicIntegerLambda {
   class Evaluator(ollComputation: OLLComputation,

@@ -2,7 +2,7 @@ package com.github.mbuzdalov.oll
 
 import java.io.PrintWriter
 
-import com.github.mbuzdalov.math.MathEx
+import com.github.mbuzdalov.util.MathEx
 
 /**
  * This class assists in computing the runtime of a given configuration of the (1+(lambda,lambda)) GA.

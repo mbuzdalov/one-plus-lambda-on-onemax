@@ -7,7 +7,7 @@ import scala.util.Using
 
 import com.github.mbuzdalov.opl.computation.OptimalRunningTime
 import com.github.mbuzdalov.opl.distribution.ParameterizedDistribution
-import com.github.mbuzdalov.opl.util.NumericMinimization
+import com.github.mbuzdalov.util.NumericMinimization
 
 
 object OptimalStaticDistribution {
