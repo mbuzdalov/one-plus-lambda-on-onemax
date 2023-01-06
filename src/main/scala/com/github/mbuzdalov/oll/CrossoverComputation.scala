@@ -47,28 +47,54 @@ object CrossoverComputation extends CrossoverComputation {
     // is possible when flipping f-x+i "good" bits and i "bad" bits for all possible i.
     // That event has the probability choose(g, f-x+i) * choose(d-g, i) * xProb^(f-x+2*i) * (1-xProb)^(d-(f-x+2*i)).
 
-    // It is convenient to rewrite two latter multiples into (1-xProb)^d and (xProb / (1-xProb))^(f-x+2*i),
-    // so we precompute the ratio.
-    val xOver1X = crossoverBias / (1 - crossoverBias)
+    if (crossoverBias > 1.5) {
+      // It is convenient to rewrite two latter multiples into (1-xProb)^d and (xProb / (1-xProb))^(f-x+2*i),
+      // so we precompute the ratio.
+      val xOver1X = crossoverBias / (1 - crossoverBias)
 
-    // Now we compute the probabilities of obtaining each fitness f (expressed as fitness delta f-x)
-    // by ONE crossover application.
-    val badBitsInDifference = distanceToParent - goodBitsInDifference
-    var goodFlip = 1
-    var p0 = crossoverBias * math.pow(1 - crossoverBias, distanceToParent - 1) * goodBitsInDifference
-    while (goodFlip <= goodBitsInDifference) {
-      val badFlipLimit = math.min(goodFlip - 1, badBitsInDifference)
-      var badFlip = 0
-      var p = p0
-      while (badFlip <= badFlipLimit) {
-        probOfReachingF(goodFlip - badFlip) += p
-        p *= xOver1X * (badBitsInDifference - badFlip)
-        badFlip += 1
-        p /= badFlip
+      // Now we compute the probabilities of obtaining each fitness f (expressed as fitness delta f-x)
+      // by ONE crossover application.
+      val badBitsInDifference = distanceToParent - goodBitsInDifference
+      var goodFlip = 1
+      var p0 = crossoverBias * math.pow(1 - crossoverBias, distanceToParent - 1) * goodBitsInDifference
+      while (goodFlip <= goodBitsInDifference) {
+        val badFlipLimit = math.min(goodFlip - 1, badBitsInDifference)
+        var badFlip = 0
+        var p = p0
+        while (badFlip <= badFlipLimit) {
+          probOfReachingF(goodFlip - badFlip) += p
+          p *= xOver1X * (badBitsInDifference - badFlip)
+          badFlip += 1
+          p /= badFlip
+        }
+        p0 *= xOver1X * (goodBitsInDifference - goodFlip)
+        goodFlip += 1
+        p0 /= goodFlip
       }
-      p0 *= xOver1X * (goodBitsInDifference - goodFlip)
-      goodFlip += 1
-      p0 /= goodFlip
+    } else {
+      // It is convenient to rewrite two latter multiples into (1-xProb)^d and (xProb / (1-xProb))^(f-x+2*i),
+      // so we precompute the ratio.
+      val xOver1X = math.log(crossoverBias) - math.log(1 - crossoverBias)
+
+      // Now we compute the probabilities of obtaining each fitness f (expressed as fitness delta f-x)
+      // by ONE crossover application.
+      val badBitsInDifference = distanceToParent - goodBitsInDifference
+      var goodFlip = 1
+      var p0 = math.log(crossoverBias) + math.log(1 - crossoverBias) * (distanceToParent - 1) + math.log(goodBitsInDifference)
+      while (goodFlip <= goodBitsInDifference) {
+        val badFlipLimit = math.min(goodFlip - 1, badBitsInDifference)
+        var badFlip = 0
+        var p = p0
+        while (badFlip <= badFlipLimit) {
+          probOfReachingF(goodFlip - badFlip) += math.exp(p)
+          p += xOver1X + math.log(badBitsInDifference - badFlip)
+          badFlip += 1
+          p -= math.log(badFlip)
+        }
+        p0 += xOver1X + math.log(goodBitsInDifference - goodFlip)
+        goodFlip += 1
+        p0 -= math.log(goodFlip)
+      }
     }
 
     // The remaining probability is for being no better
@@ -83,7 +109,7 @@ object CrossoverComputation extends CrossoverComputation {
     }
     probOfReachingF(0) = 1.0 - probOfReachingFSum
     if (probOfReachingF(0) < 0) {
-      assert(probOfReachingF(0) >= -1e-9)
+      assert(probOfReachingF(0) >= -1e-9, s"${probOfReachingF(0)}")
       probOfReachingF(0) = 0
     }
 
