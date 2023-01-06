@@ -74,4 +74,12 @@ object MathEx {
     }
     theTotalRuntime
   }
+
+  def multiply(array: Array[Double], value: Double): Unit = {
+    var i = 0
+    while (i < array.length) {
+      array(i) *= value
+      i += 1
+    }
+  }
 }

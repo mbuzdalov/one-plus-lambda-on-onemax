@@ -7,8 +7,7 @@ import scala.util.Using
 
 import com.github.mbuzdalov.opl.computation.OptimalRunningTime
 import com.github.mbuzdalov.opl.distribution.ParameterizedDistribution
-import com.github.mbuzdalov.util.NumericMinimization
-
+import com.github.mbuzdalov.util.{FastRandom, MathEx, NumericMinimization}
 
 object OptimalStaticDistribution {
   private class FixedDistribution(distribution: Array[Double]) extends ParameterizedDistribution[Unit] {
@@ -68,7 +67,11 @@ object OptimalStaticDistribution {
 
   def findOptimalDistribution(n: Int, lambda: Int): RunResult = {
     val objectiveFunction = new FitnessFunction(lambda)
-    val (finalDistribution, finalFitness) = NumericMinimization.optimizeDistributionBySeparableCMAES(n,
+    val rng = FastRandom.threadLocal
+    val initialGuess = Array.fill(n)(rng.nextDouble())
+    MathEx.multiply(initialGuess, 1.0 / initialGuess.sum)
+    val (finalDistribution, finalFitness) = NumericMinimization.optimizeDistributionBySeparableCMAES(initialGuess,
+      _ => 0.0, _ => 1.0,
       objectiveFunction.evaluate, 100 * n * n, 10, 10)
     normalize(finalDistribution)
     RunResult(finalFitness, finalDistribution, objectiveFunction.sequence)
