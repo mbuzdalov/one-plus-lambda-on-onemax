@@ -7,7 +7,7 @@ import scala.io.Source
 import com.github.mbuzdalov.util.MathEx
 
 object BestBinnedIntegerLambda {
-  def run[T](n: Int, bins: Seq[Int], lambdas: Array[T], ollComputation: OLLComputation)(implicit t2d: T => Double): Double = {
+  private def run[T](n: Int, bins: Seq[Int], lambdas: Array[T], ollComputation: OLLComputation)(implicit t2d: T => Double): Double = {
     val runtimes = new Array[Double](n + 1)
     for (i <- bins.size - 2 to 0 by -1) {
       val lambda: Double = lambdas(i)
