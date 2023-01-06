@@ -72,6 +72,15 @@ class InMemoryCostPrioritizingCrossoverCache(maxCacheByteSize: Long,
 
   override def clear(): Unit = {
     cache.clear()
+    queue.clear()
+    byteSize = 0
+    queries = 0
+    hits = 0
+    hitTime = 0
+    totalHits = 0
+    misses = 0
+    missTime = 0
+    totalMisses = 0
   }
 }
 
