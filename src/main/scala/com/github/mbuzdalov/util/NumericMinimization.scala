@@ -69,13 +69,15 @@ object NumericMinimization {
                                            lowerBound: Int => Double,
                                            upperBound: Int => Double,
                                            function: Array[CMAIndividual] => Unit,
+                                           initialSigma: Double,
                                            maxIterations: Int,
                                            populationSize: Int,
-                                           nResamplingUntilFeasible: Int): (Array[Double], Double) = {
+                                           nResamplingUntilFeasible: Int,
+                                           logToConsole: Boolean): (Array[Double], Double) = {
     val dimension = initialMean.length
 
     // Initialize the common step size.
-    var sigma = 1.0
+    var sigma = initialSigma
 
     // Initialize constants for internal termination criteria.
     val stopTolUpX = 1e3
@@ -103,8 +105,8 @@ object NumericMinimization {
     val chiN = math.sqrt(dimension) * (1 - 1 / (4.0 * dimension) + 1 / (21.0 * dimension * dimension))
 
     // Initialize matrices and step sizes.
-    val D = Array.fill(dimension)(1 / sigma)
-    val C = Array.fill(dimension)(1 / sigma / sigma)
+    val D = Array.fill(dimension)(1.0)
+    val C = D.map(v => v * v)
     val pc, ps = new Array[Double](dimension)
 
     // Initialize fitness history to track stagnation.
@@ -127,6 +129,10 @@ object NumericMinimization {
 
     fitnessHistory.push(bestRunFitness)
 
+    if (logToConsole) {
+      println(s"Initial mean: ${bestRunIndividual.mkString("[", ", ", "]")} => $bestRunFitness")
+    }
+
     // Allocate all the memory for individuals and auxiliary fitness in/out arrays.
     val individuals = Array.fill(populationSize)(new CMAIndividual(dimension))
 
@@ -135,6 +141,7 @@ object NumericMinimization {
     var continueOptimization = true
     while (continueOptimization && iterations < maxIterations) {
       iterations += 1
+      if (logToConsole) print(s"Iteration $iterations: ")
 
       // Initialize the current population.
       individuals.foreach(_.initialize(random, lowerBound, upperBound, xMean, D, sigma, nResamplingUntilFeasible))
@@ -194,6 +201,11 @@ object NumericMinimization {
       if (bestRunFitness > bestFitness) {
         bestRunFitness = bestFitness
         bestRunIndividual = individuals(0).getFixedX.clone
+        if (logToConsole) {
+          println(s"update to ${bestRunIndividual.mkString("[", ", ", "]")} => $bestRunFitness")
+        }
+      } else {
+        println(s"best fitness $bestFitness")
       }
 
       // Collect the data needed for termination condition checks.

@@ -26,4 +26,12 @@ class CommandLineArgs(args: Array[String]) {
       case Some(result) => result
     }
   }
+
+  def getDouble(name: String): Double = getStringOption(name) match {
+    case None => throw new IllegalArgumentException(s"--$name: option not found (expected a 64-bit floating-point value)")
+    case Some(v) => v.toDoubleOption match {
+      case None => throw new IllegalArgumentException(s"--$name: expected a 64-bit floating-point value, found '$v''")
+      case Some(result) => result
+    }
+  }
 }
