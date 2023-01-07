@@ -8,11 +8,36 @@ import scala.io.Source
 import com.github.mbuzdalov.util.{MathEx, NumericMinimization}
 
 object BestBinnedDoubleLambda {
-  private def run(n: Int, bins: Seq[Int], lambdas: Array[Double], tlComputation: ThreadLocal[OLLComputation]): Double = {
+  private def lambdaToParts(lambda: Double, target: Array[Double], index: Int, n: Int): Unit = {
+    val integral = math.round(lambda).toInt
+    val fractional = lambda - integral
+    assert(-0.5 <= fractional && fractional < 0.5)
+    target(2 * index) = (integral - 1.0) / (n - 1)
+    target(2 * index + 1) = fractional + 0.5
+  }
+
+  private def lambdaFromParts(source: Array[Double], index: Int, n: Int): Double = {
+    val integral = source(2 * index)
+    val fractional = source(2 * index + 1)
+    math.max(1, (integral * (n - 1)).toInt + 1 + fractional - 0.5)
+  }
+
+  private def individualToLambdaString(ind: Array[Double], n: Int): String = {
+    var i = 0
+    val sb = new StringBuilder("[")
+    while (i * 2 < ind.length) {
+      if (i != 0) sb.append(", ")
+      sb.append(lambdaFromParts(ind, i, n))
+      i += 1
+    }
+    sb.result()
+  }
+
+  private def run(n: Int, bins: Seq[Int], lambdaGens: Array[Double], tlComputation: ThreadLocal[OLLComputation]): Double = {
     val ollComputation = tlComputation.get()
     val runtimes = new Array[Double](n + 1)
     for (i <- bins.size - 2 to 0 by -1) {
-      val lambda: Double = lambdas(i)
+      val lambda = lambdaFromParts(lambdaGens, i, n)
       for (f <- bins(i + 1) - 1 to bins(i) by -1) {
         runtimes(f) = ollComputation.findRuntime(f, lambda, runtimes)
       }
@@ -54,21 +79,18 @@ object BestBinnedDoubleLambda {
 
     val bins = (0 to 30).map(log => n - (n >>> log)).distinct.sorted
     val lambdaTable = data.drop(1).map(line => line.split(',')(1).toDouble).reverse
-    val rawLambdaValues = new Array[Double](bins.length - 1)
-    for (i <- rawLambdaValues.indices) {
+    val rawLambdaValues = new Array[Double](2 * (bins.length - 1))
+    for (i <- 0 until bins.length - 1) {
       val sum = lambdaTable.indices.filter(j => bins(i) <= j && j < bins(i + 1)).map(lambdaTable).sum
-      rawLambdaValues(i) = sum / (bins(i + 1) - bins(i))
+      val lambda = if (i == 0) 1 else sum / (bins(i + 1) - bins(i))
+      lambdaToParts(lambda, rawLambdaValues, i, n)
     }
     println(s"Bins: ${bins.mkString(", ")}")
-    rawLambdaValues(0) = 1
-
-    val nonRoundedRuntime = run(n, bins, rawLambdaValues, tlComputation)
-    println(s"Non-rounded runtime: $nonRoundedRuntime with ${rawLambdaValues.mkString(", ")}")
 
     val pool = new ScheduledThreadPoolExecutor(Runtime.getRuntime.availableProcessors())
     val (result, fitness) = NumericMinimization.optimizeDistributionBySeparableCMAES(
       initialMean = rawLambdaValues,
-      lowerBound = _ => 1.0, upperBound = _ => n,
+      lowerBound = _ => 0.0, upperBound = _ => 1.0,
       function = optimize(n, tlComputation, bins, pool),
       initialSigma = cmd.getDouble("initial-sigma"),
       maxIterations = 100, populationSize = 100, nResamplingUntilFeasible = 10,
@@ -76,7 +98,7 @@ object BestBinnedDoubleLambda {
     )
     pool.shutdown()
 
-    println(s"Final result: ${result.mkString(", ")}")
+    println(s"Final result: ${individualToLambdaString(result, n)}")
     println(s"Final fitness: $fitness")
   }
 }

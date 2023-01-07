@@ -130,7 +130,7 @@ object NumericMinimization {
     fitnessHistory.push(bestRunFitness)
 
     if (logToConsole) {
-      println(s"Initial mean: ${bestRunIndividual.mkString("[", ", ", "]")} => $bestRunFitness")
+      println(s"Initial mean: $bestRunFitness by ${bestRunIndividual.mkString("[", ", ", "]")}")
     }
 
     // Allocate all the memory for individuals and auxiliary fitness in/out arrays.
@@ -202,7 +202,7 @@ object NumericMinimization {
         bestRunFitness = bestFitness
         bestRunIndividual = individuals(0).getFixedX.clone
         if (logToConsole) {
-          println(s"update to ${bestRunIndividual.mkString("[", ", ", "]")} => $bestRunFitness")
+          println(s"update to $bestRunFitness by ${bestRunIndividual.mkString("[", ", ", "]")}")
         }
       } else {
         println(s"best fitness $bestFitness")
