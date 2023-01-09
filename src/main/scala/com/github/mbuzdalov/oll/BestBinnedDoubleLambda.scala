@@ -1,11 +1,11 @@
 package com.github.mbuzdalov.oll
 
-import java.{util => ju}
 import java.util.concurrent.{Callable, ScheduledThreadPoolExecutor}
+import java.{util => ju}
 
 import scala.io.Source
 
-import com.github.mbuzdalov.util.{MathEx, NumericMinimization}
+import com.github.mbuzdalov.util.NumericMinimization
 
 object BestBinnedDoubleLambda {
   private def lambdaToParts(lambda: Double, target: Array[Double], index: Int, n: Int): Unit = {
@@ -33,18 +33,8 @@ object BestBinnedDoubleLambda {
     sb.result()
   }
 
-  private def run(n: Int, bins: Seq[Int], lambdaGens: Array[Double], tlComputation: ThreadLocal[OLLComputation]): Double = {
-    val ollComputation = tlComputation.get()
-    val runtimes = new Array[Double](n + 1)
-    for (i <- bins.size - 2 to 0 by -1) {
-      val lambda = lambdaFromParts(lambdaGens, i, n)
-      for (f <- bins(i + 1) - 1 to bins(i) by -1) {
-        runtimes(f) = ollComputation.findRuntime(f, lambda, runtimes)
-      }
-    }
-    ollComputation.crossoverComputation.clear()
-    MathEx.expectedRuntimeOnBitStrings(n, runtimes)
-  }
+  private def run(n: Int, bins: Seq[Int], lambdaGens: Array[Double], tlComputation: ThreadLocal[OLLComputation]): Double =
+    RunGivenLambdas.run(n, bins, i => lambdaFromParts(lambdaGens, i, n), tlComputation.get())
 
   private def optimize(n: Int, tlComputation: ThreadLocal[OLLComputation], bins: Seq[Int], pool: ScheduledThreadPoolExecutor)
                       (a: Array[NumericMinimization.CMAIndividual]): Unit = {
@@ -77,7 +67,7 @@ object BestBinnedDoubleLambda {
         crossoverComputation = crossoverComputation)
     })
 
-    val bins = (0 to 30).map(log => n - (n >>> log)).distinct.sorted
+    val bins = RunGivenLambdas.defaultBins(n)
     val lambdaTable = data.drop(1).map(line => line.split(',')(1).toDouble).reverse
     val rawLambdaValues = new Array[Double](2 * (bins.length - 1))
     for (i <- 0 until bins.length - 1) {

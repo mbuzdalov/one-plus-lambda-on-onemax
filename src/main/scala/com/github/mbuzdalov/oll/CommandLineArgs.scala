@@ -19,6 +19,14 @@ class CommandLineArgs(args: Array[String]) {
     }
   }
 
+  def getInt(name: String): Int = getStringOption(name) match {
+    case None => throw new IllegalArgumentException(s"--$name: option not found (expected a 32-bit integer)")
+    case Some(v) => v.toIntOption match {
+      case None => throw new IllegalArgumentException(s"--$name: expected a 32-bit integer, found '$v''")
+      case Some(result) => result
+    }
+  }
+
   def getLong(name: String): Long = getStringOption(name) match {
     case None => throw new IllegalArgumentException(s"--$name: option not found (expected a 64-bit integer)")
     case Some(v) => v.toLongOption match {

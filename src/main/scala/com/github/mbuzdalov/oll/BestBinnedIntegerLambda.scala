@@ -4,20 +4,7 @@ import java.util.Random
 
 import scala.io.Source
 
-import com.github.mbuzdalov.util.MathEx
-
 object BestBinnedIntegerLambda {
-  private def run[T](n: Int, bins: Seq[Int], lambdas: Array[T], ollComputation: OLLComputation)(implicit t2d: T => Double): Double = {
-    val runtimes = new Array[Double](n + 1)
-    for (i <- bins.size - 2 to 0 by -1) {
-      val lambda: Double = lambdas(i)
-      for (f <- bins(i + 1) - 1 to bins(i) by -1) {
-        runtimes(f) = ollComputation.findRuntime(f, lambda, runtimes)
-      }
-    }
-    MathEx.expectedRuntimeOnBitStrings(n, runtimes)
-  }
-
   def main(args: Array[String]): Unit = {
     val cmd = new CommandLineArgs(args)
     val input = Source.fromFile(cmd.getString("input", " (expected input filename)"))
@@ -40,7 +27,7 @@ object BestBinnedIntegerLambda {
       ignoreCrossoverParentDuplicates = cmd2.getBoolean("ignore-crossover-parent-duplicates"),
       crossoverComputation = crossoverComputation)
 
-    val bins = (0 to 30).map(log => n - (n >>> log)).distinct.sorted
+    val bins = RunGivenLambdas.defaultBins(n)
     val lambdaTable = data.drop(1).map(line => line.split(',')(1).toDouble).reverse
     val rawLambdaValues = new Array[Double](bins.length - 1)
     for (i <- rawLambdaValues.indices) {
@@ -50,12 +37,12 @@ object BestBinnedIntegerLambda {
     println(s"Bins: ${bins.mkString(", ")}")
     rawLambdaValues(0) = 1
 
-    val nonRoundedRuntime = run(n, bins, rawLambdaValues, ollComputation)
+    val nonRoundedRuntime = RunGivenLambdas.run(n, bins, rawLambdaValues, ollComputation)
     println(s"Non-rounded runtime: $nonRoundedRuntime with ${rawLambdaValues.mkString(", ")}")
 
     val lambdaValues = rawLambdaValues.map(v => math.round(v).toInt)
 
-    var currentRuntime = run(n, bins, lambdaValues, ollComputation)
+    var currentRuntime = RunGivenLambdas.run(n, bins, i => lambdaValues(i), ollComputation)
     println(s"Initial runtime: $currentRuntime with ${lambdaValues.mkString(", ")}")
     var changed = false
     val rng = new Random()
@@ -67,7 +54,7 @@ object BestBinnedIntegerLambda {
       for (i <- lambdaValues.indices) {
         for (change <- changes(rng.nextInt(changes.size)) if lambdaValues(i) + change > 0) {
           lambdaValues(i) += change
-          val newRuntime = run(n, bins, lambdaValues, ollComputation)
+          val newRuntime = RunGivenLambdas.run(n, bins, i => lambdaValues(i), ollComputation)
           if (newRuntime < currentRuntime) {
             currentRuntime = newRuntime
             changed = true
