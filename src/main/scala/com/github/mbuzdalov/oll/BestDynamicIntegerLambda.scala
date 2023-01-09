@@ -6,9 +6,7 @@ import java.util.concurrent.{Callable, ScheduledThreadPoolExecutor}
 import com.github.mbuzdalov.util.MathEx
 
 object BestDynamicIntegerLambda {
-  class Evaluator(ollComputation: OLLComputation,
-                  output: Option[String]) {
-
+  class Evaluator(ollComputation: OLLComputation, output: Option[String]) {
     private val n = ollComputation.n
     private val lambdas: Array[Int] = Array.ofDim[Int](n + 1)
     private val runtimes: Array[Double] = Array.ofDim[Double](n + 1)
