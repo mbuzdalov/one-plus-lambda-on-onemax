@@ -30,8 +30,7 @@ class OLLComputation(val n: Int,
    * @param runtimes the runtimes for given fitness values.
    * @return the runtime for the given parameters.
    */
-  def findRuntime(parentFitness: Int, lambda: Double, runtimes: Array[Double]): Double = {
-    val popSize = math.round(lambda).toInt
+  def findRuntime(parentFitness: Int, lambda: Double, populationSize: Int, runtimes: Array[Double]): Double = {
     val mProb = lambda / n
     val xProb = 1 / lambda
 
@@ -50,9 +49,9 @@ class OLLComputation(val n: Int,
     if (!neverMutateZeroBits) {
       val probability = math.exp(n * log1MProb)
       if (ignoreCrossoverParentDuplicates) {
-        expectedPopSize += probability * popSize // all mutations happen, all crossovers ignored
+        expectedPopSize += probability * populationSize // all mutations happen, all crossovers ignored
       } else {
-        expectedPopSize += probability * 2 * popSize // all mutations happen, all crossovers happen
+        expectedPopSize += probability * 2 * populationSize // all mutations happen, all crossovers happen
       }
     }
 
@@ -77,7 +76,7 @@ class OLLComputation(val n: Int,
         // We may accumulate the probability in popSize runs just immediately, as well as we may collect the result.
         val pOfThisGInSingleMutation = if (parentFitness < d - g) 0.0 else math.exp(MathEx.logChoose(n - parentFitness, g) + MathEx.logChoose(parentFitness, d - g) - MathEx.logChoose(n, d))
         val newDCumulativeSum = dCumulativeSum + pOfThisGInSingleMutation
-        val pOfThisGInAllMutations = if (popSize > 1) math.pow(newDCumulativeSum, popSize) - math.pow(dCumulativeSum, popSize) else pOfThisGInSingleMutation
+        val pOfThisGInAllMutations = if (populationSize > 1) math.pow(newDCumulativeSum, populationSize) - math.pow(dCumulativeSum, populationSize) else pOfThisGInSingleMutation
         dCumulativeSum = newDCumulativeSum
 
         if (pOfThisGInAllMutations > 0 && (xProb < 1 || g > d - g)) {
@@ -89,7 +88,7 @@ class OLLComputation(val n: Int,
             dExpectation += pOfThisGInAllMutations * runtimes(parentFitness + theFitness)
           } else {
             // Getting the probability of reaching a fitness (probOfReachingF(i) corresponds to fitness x + i)
-            val probOfReachingF = crossoverComputation.compute(d, g, popSize, xProb)
+            val probOfReachingF = crossoverComputation.compute(d, g, populationSize, xProb)
             var xProbOfImprovement, xRemainingTime = 0.0
             // includeBestMutantInComparison: we compute the probabilities of getting all fitness values,
             // but for those smaller than the best mutant, which we know, we use the runtime value
@@ -123,8 +122,8 @@ class OLLComputation(val n: Int,
 
       // ignoreCrossoverParentDuplicates: seems that influences only the expected iteration size
       val expectedIterationSize = if (ignoreCrossoverParentDuplicates) {
-        popSize + popSize * (1 - math.pow(xProb, d) - math.pow(1 - xProb, d))
-      } else 2.0 * popSize
+        populationSize + populationSize * (1 - math.pow(xProb, d) - math.pow(1 - xProb, d))
+      } else 2.0 * populationSize
 
       expectedPopSize += expectedIterationSize * multipleHere
 

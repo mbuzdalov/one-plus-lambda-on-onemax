@@ -34,7 +34,12 @@ object BestBinnedDoubleLambda {
   }
 
   private def run(n: Int, bins: Seq[Int], lambdaGens: Array[Double], tlComputation: ThreadLocal[OLLComputation]): Double =
-    RunGivenLambdas.run(n, bins, i => lambdaFromParts(lambdaGens, i, n), tlComputation.get())
+    RunGivenLambdas.run(
+      n = n,
+      bins = bins,
+      lambdas = i => lambdaFromParts(lambdaGens, i, n),
+      populationSizes = i => math.round(lambdaFromParts(lambdaGens, i, n)).toInt,
+      ollComputation = tlComputation.get())
 
   private def optimize(n: Int, tlComputation: ThreadLocal[OLLComputation], bins: Seq[Int], pool: ScheduledThreadPoolExecutor)
                       (a: Array[NumericMinimization.CMAIndividual]): Unit = {

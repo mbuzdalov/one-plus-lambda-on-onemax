@@ -28,7 +28,8 @@ object BestDynamicIntegerLambda {
 
         val tasks = new java.util.ArrayList[Callable[Double]](n)
         for (lambda <- 1 to n) {
-          tasks.add(() => ollComputation.findRuntime(x, lambda, runtimes))
+          tasks.add(() => ollComputation.findRuntime(parentFitness = x, lambda = lambda,
+            populationSize = lambda, runtimes = runtimes))
         }
         val futures = pool.invokeAll(tasks)
 

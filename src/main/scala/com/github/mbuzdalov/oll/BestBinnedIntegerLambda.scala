@@ -37,12 +37,12 @@ object BestBinnedIntegerLambda {
     println(s"Bins: ${bins.mkString(", ")}")
     rawLambdaValues(0) = 1
 
-    val nonRoundedRuntime = RunGivenLambdas.run(n, bins, rawLambdaValues, ollComputation)
+    val nonRoundedRuntime = RunGivenLambdas.run(n, bins, rawLambdaValues, i => math.round(rawLambdaValues(i)).toInt, ollComputation)
     println(s"Non-rounded runtime: $nonRoundedRuntime with ${rawLambdaValues.mkString(", ")}")
 
     val lambdaValues = rawLambdaValues.map(v => math.round(v).toInt)
 
-    var currentRuntime = RunGivenLambdas.run(n, bins, i => lambdaValues(i), ollComputation)
+    var currentRuntime = RunGivenLambdas.run(n, bins, i => lambdaValues(i), lambdaValues, ollComputation)
     println(s"Initial runtime: $currentRuntime with ${lambdaValues.mkString(", ")}")
     var changed = false
     val rng = new Random()
@@ -54,7 +54,7 @@ object BestBinnedIntegerLambda {
       for (i <- lambdaValues.indices) {
         for (change <- changes(rng.nextInt(changes.size)) if lambdaValues(i) + change > 0) {
           lambdaValues(i) += change
-          val newRuntime = RunGivenLambdas.run(n, bins, i => lambdaValues(i), ollComputation)
+          val newRuntime = RunGivenLambdas.run(n, bins, i => lambdaValues(i), lambdaValues, ollComputation)
           if (newRuntime < currentRuntime) {
             currentRuntime = newRuntime
             changed = true

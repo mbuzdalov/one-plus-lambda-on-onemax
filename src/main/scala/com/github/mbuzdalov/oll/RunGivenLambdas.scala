@@ -5,12 +5,13 @@ import com.github.mbuzdalov.util.MathEx
 object RunGivenLambdas {
   def defaultBins(n: Int): Seq[Int] = (0 to 30).map(log => n - (n >>> log)).distinct.sorted
 
-  def run(n: Int, bins: Seq[Int], lambdas: Int => Double, ollComputation: OLLComputation): Double = {
+  def run(n: Int, bins: Seq[Int], lambdas: Int => Double, populationSizes: Int => Int, ollComputation: OLLComputation): Double = {
     val runtimes = new Array[Double](n + 1)
     for (i <- bins.size - 2 to 0 by -1) {
-      val lambda: Double = lambdas(i)
+      val lambda = lambdas(i)
+      val populationSize = populationSizes(i)
       for (f <- bins(i + 1) - 1 to bins(i) by -1) {
-        runtimes(f) = ollComputation.findRuntime(f, lambda, runtimes)
+        runtimes(f) = ollComputation.findRuntime(f, lambda, populationSize, runtimes)
       }
     }
     MathEx.expectedRuntimeOnBitStrings(n, runtimes)
@@ -38,7 +39,7 @@ object RunGivenLambdas {
       ignoreCrossoverParentDuplicates = cmd.getBoolean("ignore-crossover-parent-duplicates"),
       crossoverComputation = crossoverComputation)
 
-    val result = run(n, bins, lambdas, ollComputation)
+    val result = run(n, bins, lambdas, i => math.round(lambdas(i)).toInt, ollComputation)
     println(result)
   }
 }
