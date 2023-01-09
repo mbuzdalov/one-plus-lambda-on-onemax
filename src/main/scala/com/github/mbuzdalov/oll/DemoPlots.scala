@@ -1,5 +1,7 @@
 package com.github.mbuzdalov.oll
 
+import java.util.concurrent.{Callable, ScheduledThreadPoolExecutor}
+
 object DemoPlots {
   private def varyingLastLambda(): Unit = {
     val n = 500
@@ -22,29 +24,49 @@ object DemoPlots {
     val popSizes = lambdas.map(v => math.round(v).toInt)
     val lastIdx = lambdas.length - 1
 
+    val tasks = new java.util.ArrayList[Callable[Unit]]
+
     for (last <- 10 to 300) {
       if (last % 10 == 5) {
-        val ulpLambda = math.nextDown(last / 10.0)
-        lambdas(lastIdx) = ulpLambda
-        popSizes(lastIdx) = math.round(ulpLambda).toInt
-        println(s"$ulpLambda,rounding,${RunGivenLambdas.run(n, bins, lambdas, popSizes, ollComputation)}")
+        tasks.add(() => {
+          val lambda = math.nextDown(last / 10.0)
+          val myLambdas = lambdas.clone()
+          val myPopSizes = popSizes.clone()
+          myLambdas(lastIdx) = lambda
+          myPopSizes(lastIdx) = math.round(lambda).toInt
+          val result = RunGivenLambdas.run(n, bins, myLambdas, myPopSizes, ollComputation)
+          DemoPlots.synchronized(println(s"$lambda,rounding,$result"))
+        })
       }
-      val lastLambda = last / 10.0
-      lambdas(lastIdx) = lastLambda
-      popSizes(lastIdx) = math.round(lastLambda).toInt
-      println(s"$lastLambda,rounding,${RunGivenLambdas.run(n, bins, lambdas, popSizes, ollComputation)}")
+
+      tasks.add(() => {
+        val myLambdas = lambdas.clone()
+        val myPopSizes = popSizes.clone()
+        val lambda = last / 10.0
+        myLambdas(lastIdx) = lambda
+        myPopSizes(lastIdx) = math.round(lambda).toInt
+        val result = RunGivenLambdas.run(n, bins, myLambdas, myPopSizes, ollComputation)
+        DemoPlots.synchronized(println(s"$lambda,rounding,$result"))
+      })
     }
 
     for (popSize <- 1 to 30) {
-      for (delta <- -10 to 10) {
-        val lambda = popSize + delta / 10.0
-        if (lambda >= 1) {
-          lambdas(lastIdx) = lambda
-          popSizes(lastIdx) = popSize
-          println(s"$lambda,$popSize,${RunGivenLambdas.run(n, bins, lambdas, popSizes, ollComputation)}")
-        }
+      for (lambda10 <- 10 to 300) {
+        tasks.add(() => {
+          val myLambdas = lambdas.clone()
+          val myPopSizes = popSizes.clone()
+          val lambda = lambda10 / 10.0
+          myLambdas(lastIdx) = lambda
+          myPopSizes(lastIdx) = popSize
+          val result = RunGivenLambdas.run(n, bins, myLambdas, myPopSizes, ollComputation)
+          DemoPlots.synchronized(println(s"$lambda,$popSize,$result"))
+        })
       }
     }
+
+    val pool = new ScheduledThreadPoolExecutor(Runtime.getRuntime.availableProcessors())
+    pool.invokeAll(tasks)
+    pool.shutdown()
   }
 
   def main(args: Array[String]): Unit = {
