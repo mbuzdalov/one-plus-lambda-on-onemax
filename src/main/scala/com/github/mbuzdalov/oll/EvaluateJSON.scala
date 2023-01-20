@@ -1,7 +1,8 @@
 package com.github.mbuzdalov.oll
 
 import java.io.{BufferedReader, FileReader, PrintWriter}
-import java.util.StringTokenizer
+import java.util.{StringTokenizer, ArrayList => JArrayList}
+import java.util.concurrent.{Callable, ScheduledThreadPoolExecutor}
 
 import scala.util.Using
 
@@ -23,9 +24,7 @@ object EvaluateJSON {
     val input = Using.resource(new BufferedReader(new FileReader(cmd.getString("input", "(expected input filename)"))))(_.readLine())
 
     Using.resource(new PrintWriter(cmd.getString("output", "(expected output filename)"))) { out =>
-      out.print("[")
       val st = new StringTokenizer(input, ":[]{}, ")
-      var isFirst = true
 
       val nToken = "\"n\""
       val experimentToken = "\"experiment\""
@@ -34,13 +33,8 @@ object EvaluateJSON {
       val lambdasToken = "\"lbds\""
       val computedRuntimeMeanToken = "\"computed_runtime_mean\""
 
+      val tasks = new JArrayList[Callable[String]]
       while (st.hasMoreTokens) {
-        if (!isFirst) {
-          out.print(", ")
-        } else {
-          isFirst = false
-        }
-
         assert(st.nextToken() == nToken)
         val n = st.nextToken().toInt
         assert(st.nextToken() == experimentToken)
@@ -52,21 +46,33 @@ object EvaluateJSON {
         assert(st.nextToken() == lambdasToken)
         val lambdas = Array.fill(n)(st.nextToken().toDouble)
 
-        val crossoverComputation = new InMemoryCostPrioritizingCrossoverCache(
-          maxCacheByteSize = cmd.getLong("max-cache-byte-size"),
-          delegate = CrossoverComputation,
-          verbose = false)
+        tasks.add(() => {
+          val crossoverComputation = new InMemoryCostPrioritizingCrossoverCache(
+            maxCacheByteSize = cmd.getLong("max-cache-byte-size"),
+            delegate = CrossoverComputation,
+            verbose = false)
 
-        val ollComputation = new OLLComputation(n,
-          neverMutateZeroBits = cmd.getBoolean("never-mutate-zero-bits"),
-          includeBestMutantInComparison = cmd.getBoolean("include-best-mutant"),
-          ignoreCrossoverParentDuplicates = cmd.getBoolean("ignore-crossover-parent-duplicates"),
-          crossoverComputation = crossoverComputation)
+          val ollComputation = new OLLComputation(n,
+            neverMutateZeroBits = cmd.getBoolean("never-mutate-zero-bits"),
+            includeBestMutantInComparison = cmd.getBoolean("include-best-mutant"),
+            ignoreCrossoverParentDuplicates = cmd.getBoolean("ignore-crossover-parent-duplicates"),
+            crossoverComputation = crossoverComputation)
 
-        val result = run(n, lambdas, i => math.round(lambdas(i)).toInt, ollComputation)
-        println(s"$empiricalMean +- $empiricalStd => $result")
+          val result = run(n, lambdas, i => math.round(lambdas(i)).toInt, ollComputation)
+          crossoverComputation.clear()
+          println(s"$empiricalMean +- $empiricalStd => $result")
 
-        out.print(s"{$nToken: $n, $experimentToken: $experimentName, $empiricalRuntimeMeanToken: $empiricalMean, $empiricalRuntimeStdToken: $empiricalStd, $computedRuntimeMeanToken: $result, $lambdasToken: ${lambdas.mkString("[", ", ", "]")}}")
+          s"{$nToken: $n, $experimentToken: $experimentName, $empiricalRuntimeMeanToken: $empiricalMean, $empiricalRuntimeStdToken: $empiricalStd, $computedRuntimeMeanToken: $result, $lambdasToken: ${lambdas.mkString("[", ", ", "]")}}"
+        })
+      }
+
+      val pool = new ScheduledThreadPoolExecutor(Runtime.getRuntime.availableProcessors())
+      val results = pool.invokeAll(tasks)
+
+      out.print("[")
+      for (i <- 0 until tasks.size) {
+        if (i == 0) out.print(", ")
+        out.print(results.get(i).get())
       }
       out.println("]")
     }
