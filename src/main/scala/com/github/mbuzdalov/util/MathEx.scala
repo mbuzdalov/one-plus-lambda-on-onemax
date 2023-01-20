@@ -6,6 +6,7 @@ import java.{util => ju}
 import spire.implicits._
 
 object MathEx {
+  private[this] var logCache: Array[Double] = new Array(2)
   private[this] var logFactorialCache: Array[Double] = new Array(2)
   private[this] def ensureFactorialExists(n: Int): Unit = {
     if (logFactorialCache.length <= n) {
@@ -13,14 +14,17 @@ object MathEx {
       synchronized {
         if (logFactorialCache.length <= n) {
           val newLength = if (n < (1 << 30)) nextPowerOfTwo(n + 1) else Int.MaxValue
-          val newArray = new Array[Double](newLength)
-          System.arraycopy(logFactorialCache, 0, newArray, 0, logFactorialCache.length)
+          val newLogArray, newFactArray = new Array[Double](newLength)
+          System.arraycopy(logCache, 0, newLogArray, 0, logFactorialCache.length)
+          System.arraycopy(logFactorialCache, 0, newFactArray, 0, logFactorialCache.length)
           var i = logFactorialCache.length
-          while (i < newArray.length && i >= 0) {
-            newArray(i) = newArray(i - 1) + math.log(i)
+          while (i < newFactArray.length && i >= 0) {
+            newLogArray(i) = math.log(i)
+            newFactArray(i) = newFactArray(i - 1) + newLogArray(i)
             i += 1
           }
-          logFactorialCache = newArray
+          logCache = newLogArray
+          logFactorialCache = newFactArray
         }
       }
     }
@@ -48,6 +52,11 @@ object MathEx {
   def logFactorialBig(n: Int): BigDecimal = {
     ensureBDFactorialExists(n)
     bdLogFactorialCache.get(n)
+  }
+
+  def log(n: Int): Double = {
+    ensureFactorialExists(n)
+    logCache(n)
   }
 
   def logFactorial(n: Int): Double = {

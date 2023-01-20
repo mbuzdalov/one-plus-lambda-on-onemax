@@ -1,5 +1,7 @@
 package com.github.mbuzdalov.oll
 
+import com.github.mbuzdalov.util.MathEx
+
 /**
  * This is an interface to computation and storage of crossover transition probability facilities.
  * The default implementation, that does the math but does not cache anything, is given in the companion object.
@@ -74,26 +76,28 @@ object CrossoverComputation extends CrossoverComputation {
     } else {
       // It is convenient to rewrite two latter multiples into (1-xProb)^d and (xProb / (1-xProb))^(f-x+2*i),
       // so we precompute the ratio.
-      val xOver1X = math.log(crossoverBias) - math.log(1 - crossoverBias)
+      val lCB = math.log(crossoverBias)
+      val l1CB = math.log(1 - crossoverBias)
+      val xOver1X = lCB - l1CB
 
       // Now we compute the probabilities of obtaining each fitness f (expressed as fitness delta f-x)
       // by ONE crossover application.
       val badBitsInDifference = distanceToParent - goodBitsInDifference
       var goodFlip = 1
-      var p0 = math.log(crossoverBias) + math.log(1 - crossoverBias) * (distanceToParent - 1) + math.log(goodBitsInDifference)
+      var p0 = lCB + l1CB * (distanceToParent - 1) + MathEx.log(goodBitsInDifference)
       while (goodFlip <= goodBitsInDifference) {
         val badFlipLimit = math.min(goodFlip - 1, badBitsInDifference)
         var badFlip = 0
         var p = p0
         while (badFlip <= badFlipLimit) {
           probOfReachingF(goodFlip - badFlip) += math.exp(p)
-          p += xOver1X + math.log(badBitsInDifference - badFlip)
+          p += xOver1X + MathEx.log(badBitsInDifference - badFlip)
           badFlip += 1
-          p -= math.log(badFlip)
+          p -= MathEx.log(badFlip)
         }
-        p0 += xOver1X + math.log(goodBitsInDifference - goodFlip)
+        p0 += xOver1X + MathEx.log(goodBitsInDifference - goodFlip)
         goodFlip += 1
-        p0 -= math.log(goodFlip)
+        p0 -= MathEx.log(goodFlip)
       }
     }
 
