@@ -1,4 +1,4 @@
-package com.github.mbuzdalov.opl.util
+package com.github.mbuzdalov.util
 
 class FitnessHistory(length: Int) {
   private val inputStack, outputMin, outputMax = new Array[Double](length)

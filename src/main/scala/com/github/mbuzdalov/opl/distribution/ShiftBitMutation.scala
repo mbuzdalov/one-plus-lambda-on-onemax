@@ -1,8 +1,8 @@
 package com.github.mbuzdalov.opl.distribution
 
 import com.github.mbuzdalov.opl.DoubleProbabilityVector
-import com.github.mbuzdalov.opl.MathEx.{logFactorial => lF}
-import com.github.mbuzdalov.opl.util.NumericMinimization
+import com.github.mbuzdalov.util.NumericMinimization
+import com.github.mbuzdalov.util.MathEx.{logFactorial => lF}
 
 object ShiftBitMutation extends ParameterizedDistribution[Double] {
   override def initialize(n: Int, param: Double, target: DoubleProbabilityVector): Unit = {

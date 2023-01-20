@@ -1,4 +1,4 @@
-package com.github.mbuzdalov.opl.util
+package com.github.mbuzdalov.util
 
 import scala.annotation.tailrec
 
@@ -33,17 +33,23 @@ object NumericMinimization {
     private var rawFitness, fitness, penalty = 0.0
 
     @tailrec
-    final def initialize(rng: FastRandom, xMean: Array[Double], D: Array[Double], sigma: Double, remaining: Int): Unit = {
+    final def initialize(rng: FastRandom,
+                         lowerBound: Int => Double,
+                         upperBound: Int => Double,
+                         xMean: Array[Double],
+                         D: Array[Double],
+                         sigma: Double,
+                         remaining: Int): Unit = {
       penalty = 0
       var i = 0
       while (i < z.length) {
         z(i) = rng.nextGaussian()
         x(i) = xMean(i) + D(i) * z(i) * sigma
-        fixedX(i) = math.min(1, math.max(0, x(i)))
+        fixedX(i) = math.min(upperBound(i), math.max(lowerBound(i), x(i)))
         penalty += math.abs(x(i) - fixedX(i))
         i += 1
       }
-      if (penalty != 0 && remaining > 0) initialize(rng, xMean, D, sigma, remaining - 1)
+      if (penalty != 0 && remaining > 0) initialize(rng, lowerBound, upperBound, xMean, D, sigma, remaining - 1)
     }
 
     def getDimension: Int = z.length
@@ -59,13 +65,19 @@ object NumericMinimization {
     override def compareTo(o: CMAIndividual): Int = java.lang.Double.compare(fitness, o.fitness)
   }
 
-  def optimizeDistributionBySeparableCMAES(dimension: Int,
+  def optimizeDistributionBySeparableCMAES(initialMean: Array[Double],
+                                           lowerBound: Int => Double,
+                                           upperBound: Int => Double,
                                            function: Array[CMAIndividual] => Unit,
+                                           initialSigma: Double,
                                            maxIterations: Int,
                                            populationSize: Int,
-                                           nResamplingUntilFeasible: Int): (Array[Double], Double) = {
+                                           nResamplingUntilFeasible: Int,
+                                           logToConsole: Boolean): (Array[Double], Double) = {
+    val dimension = initialMean.length
+
     // Initialize the common step size.
-    var sigma = 1.0
+    var sigma = initialSigma
 
     // Initialize constants for internal termination criteria.
     val stopTolUpX = 1e3
@@ -79,7 +91,7 @@ object NumericMinimization {
     val sumW = sum(weights)
     val sumWQ = sumSquares(weights)
     val muEff = sumW * sumW / sumWQ
-    multiply(weights, 1 / sumW)
+    MathEx.multiply(weights, 1 / sumW)
 
     // Initialize pre-tuned parameters and constants.
     val cc = (4 + muEff / dimension) / (dimension + 4 + 2 * muEff / dimension)
@@ -93,8 +105,8 @@ object NumericMinimization {
     val chiN = math.sqrt(dimension) * (1 - 1 / (4.0 * dimension) + 1 / (21.0 * dimension * dimension))
 
     // Initialize matrices and step sizes.
-    val D = Array.fill(dimension)(1 / sigma)
-    val C = Array.fill(dimension)(1 / sigma / sigma)
+    val D = Array.fill(dimension)(1.0)
+    val C = D.map(v => v * v)
     val pc, ps = new Array[Double](dimension)
 
     // Initialize fitness history to track stagnation.
@@ -105,18 +117,21 @@ object NumericMinimization {
     val random = FastRandom.threadLocal
 
     // Create and evaluate the initial guess.
-    val xMean = Array.fill(dimension)(random.nextDouble())
-    multiply(xMean, 1 / sum(xMean))
+    val xMean = initialMean.clone()
     var bestRunIndividual = xMean.clone
     var bestRunFitness = {
       val wrapper = new CMAIndividual(dimension)
-      wrapper.initialize(random, xMean, D, 0.0, 0)
+      wrapper.initialize(random, lowerBound, upperBound, xMean, D, 0.0, 0)
       function(Array(wrapper))
       wrapper.setPenaltyWeight(1)
       wrapper.getFitness
     }
 
     fitnessHistory.push(bestRunFitness)
+
+    if (logToConsole) {
+      println(s"Initial mean: $bestRunFitness by ${bestRunIndividual.mkString("[", ", ", "]")}")
+    }
 
     // Allocate all the memory for individuals and auxiliary fitness in/out arrays.
     val individuals = Array.fill(populationSize)(new CMAIndividual(dimension))
@@ -126,9 +141,10 @@ object NumericMinimization {
     var continueOptimization = true
     while (continueOptimization && iterations < maxIterations) {
       iterations += 1
+      if (logToConsole) print(s"Iteration $iterations: ")
 
       // Initialize the current population.
-      individuals.foreach(_.initialize(random, xMean, D, sigma, nResamplingUntilFeasible))
+      individuals.foreach(_.initialize(random, lowerBound, upperBound, xMean, D, sigma, nResamplingUntilFeasible))
 
       // Run the fitness evaluation on all the fixed individuals.
       function(individuals)
@@ -185,6 +201,11 @@ object NumericMinimization {
       if (bestRunFitness > bestFitness) {
         bestRunFitness = bestFitness
         bestRunIndividual = individuals(0).getFixedX.clone
+        if (logToConsole) {
+          println(s"update to $bestRunFitness by ${bestRunIndividual.mkString("[", ", ", "]")}")
+        }
+      } else {
+        println(s"best fitness $bestFitness")
       }
 
       // Collect the data needed for termination condition checks.
@@ -291,13 +312,5 @@ object NumericMinimization {
       i += 1
     }
     result
-  }
-
-  private def multiply(array: Array[Double], value: Double): Unit = {
-    var i = 0
-    while (i < array.length) {
-      array(i) *= value
-      i += 1
-    }
   }
 }

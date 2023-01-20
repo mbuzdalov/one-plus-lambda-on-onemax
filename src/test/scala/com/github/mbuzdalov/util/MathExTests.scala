@@ -1,4 +1,4 @@
-package com.github.mbuzdalov.opl
+package com.github.mbuzdalov.util
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers

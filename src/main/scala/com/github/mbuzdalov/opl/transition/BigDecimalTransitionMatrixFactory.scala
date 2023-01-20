@@ -1,7 +1,7 @@
 package com.github.mbuzdalov.opl.transition
 
-import com.github.mbuzdalov.opl.MathEx.{logFactorialBig => lF}
 import com.github.mbuzdalov.opl.TransitionMatrix
+import com.github.mbuzdalov.util.MathEx.{logFactorialBig => lF}
 import spire.implicits._
 
 object BigDecimalTransitionMatrixFactory extends TransitionMatrixFactory {

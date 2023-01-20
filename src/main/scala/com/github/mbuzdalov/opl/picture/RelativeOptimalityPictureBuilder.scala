@@ -8,7 +8,7 @@ import javax.imageio.ImageIO
 import scala.util.Using
 
 import com.github.mbuzdalov.opl.computation.callback.Wrapper
-import com.github.mbuzdalov.opl.util.Viridis
+import com.github.mbuzdalov.util.Viridis
 
 class RelativeOptimalityPictureBuilder[@specialized P](target: Path, xMin: Int, xMax: Int, wrapper: Wrapper[P])
   extends AutoCloseable

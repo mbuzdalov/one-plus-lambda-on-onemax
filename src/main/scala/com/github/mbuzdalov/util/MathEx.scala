@@ -1,4 +1,4 @@
-package com.github.mbuzdalov.opl
+package com.github.mbuzdalov.util
 
 import java.math.{MathContext, RoundingMode}
 import java.{util => ju}
@@ -26,7 +26,7 @@ object MathEx {
     }
   }
 
-  final val bigLogFactorialContext = new MathContext(40, RoundingMode.HALF_EVEN)
+  private[this] final val bigLogFactorialContext = new MathContext(40, RoundingMode.HALF_EVEN)
   private[this] val bdLogFactorialCache = new ju.ArrayList[BigDecimal](2)
   bdLogFactorialCache.add(BigDecimal.decimal(0, bigLogFactorialContext))
   bdLogFactorialCache.add(bdLogFactorialCache.get(0))
@@ -63,5 +63,23 @@ object MathEx {
   def nextPowerOfTwo(n: Int): Int = {
     require(n <= (1 << 30))
     1 << (32 - Integer.numberOfLeadingZeros(n - 1))
+  }
+
+  def expectedRuntimeOnBitStrings(n: Int, runtimeForFitnessOrDistance: Int => Double): Double = {
+    var x = 0
+    var theTotalRuntime = 0.0
+    while (x <= n) {
+      theTotalRuntime += runtimeForFitnessOrDistance(x) * math.exp(MathEx.logChoose(n, x) - math.log(2) * n)
+      x += 1
+    }
+    theTotalRuntime
+  }
+
+  def multiply(array: Array[Double], value: Double): Unit = {
+    var i = 0
+    while (i < array.length) {
+      array(i) *= value
+      i += 1
+    }
   }
 }
