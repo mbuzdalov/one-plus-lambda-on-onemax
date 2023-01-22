@@ -2,6 +2,8 @@ package com.github.mbuzdalov.oll
 
 import java.util.concurrent.{Callable, ScheduledThreadPoolExecutor}
 
+import com.github.mbuzdalov.oll.xover.LegacyCollectiveCrossoverComputation
+
 object DemoPlots {
   private def varyingLastLambda(): Unit = {
     val n = 500
@@ -10,7 +12,7 @@ object DemoPlots {
 
     val crossoverComputation = new InMemoryCostPrioritizingCrossoverCache(
       maxCacheByteSize = 4000000000L, //cmd.getLong("max-cache-byte-size"),
-      delegate = CrossoverComputation,
+      delegate = LegacyCollectiveCrossoverComputation,
       verbose = false)
 
     val ollComputation = new OLLComputation(n,

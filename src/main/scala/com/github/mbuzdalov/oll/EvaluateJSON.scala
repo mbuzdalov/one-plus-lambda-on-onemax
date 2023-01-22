@@ -49,7 +49,7 @@ object EvaluateJSON {
         tasks.add(() => {
           val crossoverComputation = new InMemoryCostPrioritizingCrossoverCache(
             maxCacheByteSize = cmd.getLong("max-cache-byte-size"),
-            delegate = CrossoverComputation,
+            delegate = CrossoverComputation.findMathCapableImplementation(cmd, "crossover-math"),
             verbose = false)
 
           val ollComputation = new OLLComputation(n,

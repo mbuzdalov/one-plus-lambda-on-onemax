@@ -62,7 +62,7 @@ object BestBinnedDoubleLambda {
     val tlComputation = ThreadLocal.withInitial[OLLComputation](() => {
       val crossoverComputation = new InMemoryCostPrioritizingCrossoverCache(
         maxCacheByteSize = cmd.getLong("max-cache-byte-size"),
-        delegate = CrossoverComputation,
+        delegate = CrossoverComputation.findMathCapableImplementation(cmd, "crossover-math"),
         verbose = false)
 
       new OLLComputation(n,
