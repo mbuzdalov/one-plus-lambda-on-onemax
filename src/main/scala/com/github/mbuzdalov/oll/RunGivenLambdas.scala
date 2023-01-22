@@ -31,7 +31,7 @@ object RunGivenLambdas {
     val crossoverComputation = new InMemoryCostPrioritizingCrossoverCache(
       maxCacheByteSize = cmd.getLong("max-cache-byte-size"),
       delegate = CrossoverComputation,
-      verbose = false)
+      verbose = true)
 
     val ollComputation = new OLLComputation(n,
       neverMutateZeroBits = cmd.getBoolean("never-mutate-zero-bits"),
@@ -39,7 +39,9 @@ object RunGivenLambdas {
       ignoreCrossoverParentDuplicates = cmd.getBoolean("ignore-crossover-parent-duplicates"),
       crossoverComputation = crossoverComputation)
 
+    val t0 = System.currentTimeMillis()
     val result = run(n, bins, lambdas, i => math.round(lambdas(i)).toInt, ollComputation)
-    println(result)
+    val time = System.currentTimeMillis() - t0
+    println(s"$result in $time ms")
   }
 }
