@@ -94,10 +94,13 @@ class OLLComputation(val n: Int,
             // but for those smaller than the best mutant, which we know, we use the runtime value
             // corresponding to the best mutant
             val minimumFitnessToUse = if (includeBestMutantInComparison) g - (d - g) else -1
-            var i = 1
-            while (i <= g) {
-              xProbOfImprovement += probOfReachingF(i)
-              xRemainingTime += probOfReachingF(i) * runtimes(parentFitness + math.max(i, minimumFitnessToUse))
+            var i = 0
+            while (i < probOfReachingF.length) {
+              val nextFitness = parentFitness + math.max(i, minimumFitnessToUse)
+              if (nextFitness > parentFitness) {
+                xProbOfImprovement += probOfReachingF(i)
+                xRemainingTime += probOfReachingF(i) * runtimes(nextFitness)
+              }
               i += 1
             }
             dProbability += pOfThisGInAllMutations * xProbOfImprovement
