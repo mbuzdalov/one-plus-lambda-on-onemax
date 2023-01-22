@@ -79,7 +79,7 @@ class OLLComputation(val n: Int,
         val pOfThisGInAllMutations = if (populationSize > 1) math.pow(newDCumulativeSum, populationSize) - math.pow(dCumulativeSum, populationSize) else pOfThisGInSingleMutation
         dCumulativeSum = newDCumulativeSum
 
-        if (pOfThisGInAllMutations > 0 && (xProb < 1 || g > d - g)) {
+        if (dProbability + pOfThisGInAllMutations > dProbability && (xProb < 1 || g > d - g)) {
           if (xProb == 1) {
             // Everything is flipped, so we basically consider the best mutant.
             // This is a special quick case, as only one possible offspring is generated
