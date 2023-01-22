@@ -38,7 +38,7 @@ class InMemoryCostPrioritizingCrossoverCache(maxCacheByteSize: Long,
     }
   }
 
-  override def compute(distanceToParent: Int, goodBitsInDifference: Int, populationSize: Int, crossoverBias: Double): Array[Double] = {
+  override def compute(distanceToParent: Int, goodBitsInDifference: Int, populationSize: Int, crossoverBias: AugmentedProbability): Array[Double] = {
     val entry = CacheEntry(distanceToParent, goodBitsInDifference, populationSize, crossoverBias)
     cache.synchronized {
       assert(cache.size == queue.size)
@@ -85,7 +85,7 @@ class InMemoryCostPrioritizingCrossoverCache(maxCacheByteSize: Long,
 }
 
 object InMemoryCostPrioritizingCrossoverCache {
-  private case class CacheEntry(d: Int, g: Int, popSize: Int, xProb: Double) {
+  private case class CacheEntry(d: Int, g: Int, popSize: Int, xProb: AugmentedProbability) {
     private[this] var cachedResult: Array[Double] = _
 
     def byteSize: Int = (g + 5) * 8

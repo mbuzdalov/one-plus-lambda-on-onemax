@@ -25,7 +25,7 @@ trait CrossoverComputation {
    * @param crossoverBias the probability of taking a bit from the offspring rather than from the parent.
    * @return the array of probabilities, where the i-th element means the probability of increasing the parent's fitness by i.
    */
-  def compute(distanceToParent: Int, goodBitsInDifference: Int, populationSize: Int, crossoverBias: Double): Array[Double]
+  def compute(distanceToParent: Int, goodBitsInDifference: Int, populationSize: Int, crossoverBias: AugmentedProbability): Array[Double]
 
   /**
    * Cleans up all the resources used by the object.
@@ -39,7 +39,7 @@ trait CrossoverComputation {
  * companion object and then to manage the results. This object's `compute` is thread-safe and always returns a new array.
  */
 object CrossoverComputation extends CrossoverComputation {
-  override def compute(distanceToParent: Int, goodBitsInDifference: Int, populationSize: Int, crossoverBias: Double): Array[Double] = {
+  override def compute(distanceToParent: Int, goodBitsInDifference: Int, populationSize: Int, crossoverBias: AugmentedProbability): Array[Double] = {
     val probOfReachingF = Array.ofDim[Double](goodBitsInDifference + 1)
 
     // For the Hamming distance between the parent and the offspring being `distanceToParent` = d,
@@ -49,16 +49,16 @@ object CrossoverComputation extends CrossoverComputation {
     // is possible when flipping f-x+i "good" bits and i "bad" bits for all possible i.
     // That event has the probability choose(g, f-x+i) * choose(d-g, i) * xProb^(f-x+2*i) * (1-xProb)^(d-(f-x+2*i)).
 
-    if (crossoverBias > 1.5) {
+    if (crossoverBias.value > 1.5) {
       // It is convenient to rewrite two latter multiples into (1-xProb)^d and (xProb / (1-xProb))^(f-x+2*i),
       // so we precompute the ratio.
-      val xOver1X = crossoverBias / (1 - crossoverBias)
+      val xOver1X = crossoverBias.pOverOneMinusP
 
       // Now we compute the probabilities of obtaining each fitness f (expressed as fitness delta f-x)
       // by ONE crossover application.
       val badBitsInDifference = distanceToParent - goodBitsInDifference
       var goodFlip = 1
-      var p0 = crossoverBias * math.pow(1 - crossoverBias, distanceToParent - 1) * goodBitsInDifference
+      var p0 = crossoverBias.value * math.pow(1 - crossoverBias.value, distanceToParent - 1) * goodBitsInDifference
       while (goodFlip <= goodBitsInDifference) {
         val badFlipLimit = math.min(goodFlip - 1, badBitsInDifference)
         var badFlip = 0
@@ -76,8 +76,8 @@ object CrossoverComputation extends CrossoverComputation {
     } else {
       // It is convenient to rewrite two latter multiples into (1-xProb)^d and (xProb / (1-xProb))^(f-x+2*i),
       // so we precompute the ratio.
-      val lCB = math.log(crossoverBias)
-      val l1CB = math.log(1 - crossoverBias)
+      val lCB = crossoverBias.logarithm
+      val l1CB = crossoverBias.logarithmOfOneMinus
       val xOver1X = lCB - l1CB
 
       // Now we compute the probabilities of obtaining each fitness f (expressed as fitness delta f-x)

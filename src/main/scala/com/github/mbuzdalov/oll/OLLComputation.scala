@@ -32,7 +32,7 @@ class OLLComputation(val n: Int,
    */
   def findRuntime(parentFitness: Int, lambda: Double, populationSize: Int, runtimes: Array[Double]): Double = {
     val mProb = lambda / n
-    val xProb = 1 / lambda
+    val xProb = AugmentedProbability(1 / lambda)
 
     val logMProb = math.log(mProb)
     val log1MProb = math.log1p(-mProb)
@@ -79,8 +79,8 @@ class OLLComputation(val n: Int,
         val pOfThisGInAllMutations = if (populationSize > 1) math.pow(newDCumulativeSum, populationSize) - math.pow(dCumulativeSum, populationSize) else pOfThisGInSingleMutation
         dCumulativeSum = newDCumulativeSum
 
-        if (dProbability + pOfThisGInAllMutations > dProbability && (xProb < 1 || g > d - g)) {
-          if (xProb == 1) {
+        if (dProbability + pOfThisGInAllMutations > dProbability && (xProb.value < 1 || g > d - g)) {
+          if (xProb.value == 1) {
             // Everything is flipped, so we basically consider the best mutant.
             // This is a special quick case, as only one possible offspring is generated
             val theFitness = g - (d - g)
@@ -125,7 +125,7 @@ class OLLComputation(val n: Int,
 
       // ignoreCrossoverParentDuplicates: seems that influences only the expected iteration size
       val expectedIterationSize = if (ignoreCrossoverParentDuplicates) {
-        populationSize + populationSize * (1 - math.pow(xProb, d) - math.pow(1 - xProb, d))
+        populationSize + populationSize * (1 - math.pow(xProb.value, d) - math.pow(1 - xProb.value, d))
       } else 2.0 * populationSize
 
       expectedPopSize += expectedIterationSize * multipleHere
