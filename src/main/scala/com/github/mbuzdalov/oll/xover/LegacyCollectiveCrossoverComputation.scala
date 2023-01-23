@@ -18,7 +18,7 @@ object LegacyCollectiveCrossoverComputation extends CrossoverComputation {
     // is possible when flipping f-x+i "good" bits and i "bad" bits for all possible i.
     // That event has the probability choose(g, f-x+i) * choose(d-g, i) * xProb^(f-x+2*i) * (1-xProb)^(d-(f-x+2*i)).
 
-    if (crossoverBias.value > 1.5) {
+    if (crossoverBias.value < 0.5) {
       // It is convenient to rewrite two latter multiples into (1-xProb)^d and (xProb / (1-xProb))^(f-x+2*i),
       // so we precompute the ratio.
       val xOver1X = crossoverBias.pOverOneMinusP
