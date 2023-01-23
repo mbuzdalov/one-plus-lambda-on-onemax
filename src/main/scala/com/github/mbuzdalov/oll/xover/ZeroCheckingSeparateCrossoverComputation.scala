@@ -4,10 +4,11 @@ import com.github.mbuzdalov.oll.{AugmentedProbability, CrossoverComputation}
 import com.github.mbuzdalov.util.MathEx
 
 object ZeroCheckingSeparateCrossoverComputation extends CrossoverComputation {
+  private val singularArray = Array.fill(1)(1.0)
   private val eps = 1e-20
 
   override def compute(distanceToParent: Int, goodBitsInDifference: Int, populationSize: Int, crossoverBias: AugmentedProbability): Array[Double] = {
-    val probOfReachingF = Array.ofDim[Double](goodBitsInDifference + 1)
+    var probOfReachingF: Array[Double] = null
 
     // For the Hamming distance between the parent and the offspring being `distanceToParent` = d,
     // the number of good bits in the offspring being `goodBitsInDifference` = g,
@@ -16,16 +17,16 @@ object ZeroCheckingSeparateCrossoverComputation extends CrossoverComputation {
     // is possible when flipping f-x+i "good" bits and i "bad" bits for all possible i.
     // Denote y=f-x, the event has the probability choose(g, y+i) * choose(d-g, i) * xProb^(y+2*i) * (1-xProb)^(d-(y+2*i)).
 
-    val qq = crossoverBias.pOverOneMinusP * crossoverBias.pOverOneMinusP
     var sumP = 0.0
-    var fitnessDiff = 1
-    while (fitnessDiff <= goodBitsInDifference) {
+    var fitnessDiff = goodBitsInDifference
+    while (fitnessDiff >= 1) {
       val maxI = math.min(distanceToParent - goodBitsInDifference, goodBitsInDifference - fitnessDiff)
       var localSum = 0.0
       if (maxI == 0) {
         localSum += theExpr(distanceToParent, goodBitsInDifference, fitnessDiff, 0, crossoverBias)
       } else {
         // Now we are trying to guess the index such that the value at it is the maximum
+        val qq = crossoverBias.pOverOneMinusP * crossoverBias.pOverOneMinusP
         val q2 = qq - 1
         val q1 = qq * (fitnessDiff - distanceToParent) - (fitnessDiff + 2)
         val q0 = qq * (fitnessDiff - goodBitsInDifference) * (goodBitsInDifference - distanceToParent) - (fitnessDiff + 1)
@@ -63,9 +64,15 @@ object ZeroCheckingSeparateCrossoverComputation extends CrossoverComputation {
         }
       }
 
-      probOfReachingF(fitnessDiff) = localSum
+      if (localSum > eps) {
+        if (probOfReachingF == null) {
+          probOfReachingF = new Array[Double](fitnessDiff + 1)
+        }
+        probOfReachingF(fitnessDiff) = localSum
+      }
+
       sumP += localSum
-      fitnessDiff += 1
+      fitnessDiff -= 1
     }
 
     if (sumP > 1) {
@@ -73,34 +80,32 @@ object ZeroCheckingSeparateCrossoverComputation extends CrossoverComputation {
       sumP = 1
     }
 
-    probOfReachingF(0) = 1 - sumP
+    if (probOfReachingF == null) {
+      singularArray
+    } else {
+      probOfReachingF(0) = 1 - sumP
 
-    // Now we use populationSize to obtain the final result.
-    // The basic idea is that we reach fitness f if all crossover offspring have fitness <= f,
-    // but not of them have fitness <= f-1, which results in the infamous subtraction of powers.
-    if (populationSize > 1) {
-      var sum = 0.0
-      var probOfReachingFSum = 0.0
-      var i = 0
-      while (i <= goodBitsInDifference) {
-        val newSum = sum + probOfReachingF(i)
-        probOfReachingF(i) = math.pow(newSum, populationSize) - math.pow(sum, populationSize)
-        probOfReachingFSum += probOfReachingF(i)
-        sum = newSum
-        i += 1
+      // Now we use populationSize to obtain the final result.
+      // The basic idea is that we reach fitness f if all crossover offspring have fitness <= f,
+      // but not of them have fitness <= f-1, which results in the infamous subtraction of powers.
+      if (populationSize > 1) {
+        var sum = 0.0
+        var probOfReachingFSum = 0.0
+        var i = 0
+        while (i < probOfReachingF.length) {
+          val newSum = sum + probOfReachingF(i)
+          probOfReachingF(i) = math.pow(newSum, populationSize) - math.pow(sum, populationSize)
+          probOfReachingFSum += probOfReachingF(i)
+          sum = newSum
+          i += 1
+        }
+
+        assert(math.abs(1 - sum) < 1e-9, "Total probability is not 1")
+        assert(math.abs(1 - probOfReachingFSum) < 1e-9, "Population sizing fails")
       }
 
-      assert(math.abs(1 - sum) < 1e-9, "Total probability is not 1")
-      assert(math.abs(1 - probOfReachingFSum) < 1e-9, "Population sizing fails")
+      probOfReachingF
     }
-
-    var lastIndex = goodBitsInDifference
-    while (probOfReachingF(lastIndex) < eps) {
-      lastIndex -= 1
-    }
-    if (lastIndex != goodBitsInDifference) {
-      probOfReachingF.take(lastIndex + 1)
-    } else probOfReachingF
   }
 
   private def theExpr(distanceToParent: Int, goodBitsInDifference: Int,
