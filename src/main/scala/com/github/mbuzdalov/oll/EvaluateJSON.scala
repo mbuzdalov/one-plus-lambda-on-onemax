@@ -71,10 +71,12 @@ object EvaluateJSON {
 
       out.print("[")
       for (i <- 0 until tasks.size) {
-        if (i == 0) out.print(", ")
+        if (i != 0) out.print(", ")
         out.print(results.get(i).get())
       }
       out.println("]")
+
+      pool.shutdown()
     }
   }
 }
