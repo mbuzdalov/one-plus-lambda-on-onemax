@@ -1,6 +1,6 @@
 package com.github.mbuzdalov.oll
 
-import com.github.mbuzdalov.oll.xover.{BasicSeparateCrossoverComputation, LegacyCollectiveCrossoverComputation}
+import com.github.mbuzdalov.oll.xover.{BasicSeparateCrossoverComputation, LegacyCollectiveCrossoverComputation, ZeroCheckingSeparateCrossoverComputation}
 
 /**
  * This is an interface to computation and storage of crossover transition probability facilities.
@@ -39,6 +39,7 @@ object CrossoverComputation {
     args.getString(paramName, "(expected a name for crossover computation)") match {
       case "legacy" => LegacyCollectiveCrossoverComputation
       case "basic" => BasicSeparateCrossoverComputation
+      case "0check" => ZeroCheckingSeparateCrossoverComputation
       case other => throw new IllegalArgumentException(s"I don't know the crossover computation implementation named '$other'")
     }
   }
