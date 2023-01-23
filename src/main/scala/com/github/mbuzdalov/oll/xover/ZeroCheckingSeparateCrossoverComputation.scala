@@ -22,20 +22,16 @@ object ZeroCheckingSeparateCrossoverComputation extends CrossoverComputation {
     while (fitnessDiff <= goodBitsInDifference) {
       val maxI = math.min(distanceToParent - goodBitsInDifference, goodBitsInDifference - fitnessDiff)
       var localSum = 0.0
-      if (maxI <= 4) {
-        var flippedBadBits = 0
-        while (flippedBadBits <= maxI) {
-          localSum += theExpr(distanceToParent, goodBitsInDifference, fitnessDiff, flippedBadBits, crossoverBias)
-          flippedBadBits += 1
-        }
+      if (maxI == 0) {
+        localSum += theExpr(distanceToParent, goodBitsInDifference, fitnessDiff, 0, crossoverBias)
       } else {
         // Now we are trying to guess the index such that the value at it is the maximum
         val q2 = qq - 1
         val q1 = qq * (fitnessDiff - distanceToParent) - (fitnessDiff + 2)
-        val q0 = qq * (fitnessDiff - goodBitsInDifference) * (goodBitsInDifference - distanceToParent) - (fitnessDiff - 1)
+        val q0 = qq * (fitnessDiff - goodBitsInDifference) * (goodBitsInDifference - distanceToParent) - (fitnessDiff + 1)
         val testBestI = if (math.abs(q2) < 1e-9) {
           // The linear case
-          (q0 / q1).toInt
+          (-q0 / q1).toInt
         } else {
           // The quadratic case
           ((-q1 - math.sqrt(q1 * q1 - 4 * q0 * q2)) / (2 * q2)).toInt
