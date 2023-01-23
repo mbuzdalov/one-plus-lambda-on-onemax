@@ -64,71 +64,74 @@ class OLLComputation(val n: Int,
       var dProbability, dExpectation = 0.0
       var dCumulativeSum = if (parentFitness < d) 0.0 else math.exp(MathEx.logChoose(parentFitness, d) - MathEx.logChoose(n, d))
 
-      // We need to go from the end: first model the crossover, then mutation atop of it.
-      // Everything about crossover, once d, g, popSize and xProb are fixed, is shared across fitness values
-      // and can be precomputed (or cached), so we do it.
-
-      var g = 1
-      while (g <= maxG) {
-        // In mutation, the offspring with most good bits flipped wins.
-        // We know we flipped d bits, and there are x bad bits and n-x good bits.
-        // In one run, the probability to flip g good bits is choose(n-x, g) * choose(x, d-g) / choose(n, d)
-        // We may accumulate the probability in popSize runs just immediately, as well as we may collect the result.
-        val pOfThisGInSingleMutation = if (parentFitness < d - g) 0.0 else math.exp(MathEx.logChoose(n - parentFitness, g) + MathEx.logChoose(parentFitness, d - g) - MathEx.logChoose(n, d))
-        val newDCumulativeSum = dCumulativeSum + pOfThisGInSingleMutation
-        val pOfThisGInAllMutations = if (populationSize > 1) math.pow(newDCumulativeSum, populationSize) - math.pow(dCumulativeSum, populationSize) else pOfThisGInSingleMutation
-        dCumulativeSum = newDCumulativeSum
-
-        if (dProbability + pOfThisGInAllMutations > dProbability && (xProb.value < 1 || g > d - g)) {
-          if (xProb.value == 1) {
-            // Everything is flipped, so we basically consider the best mutant.
-            // This is a special quick case, as only one possible offspring is generated
-            val theFitness = g - (d - g)
-            dProbability += pOfThisGInAllMutations
-            dExpectation += pOfThisGInAllMutations * runtimes(parentFitness + theFitness)
-          } else {
-            // Getting the probability of reaching a fitness (probOfReachingF(i) corresponds to fitness x + i)
-            val probOfReachingF = crossoverComputation.compute(d, g, populationSize, xProb)
-            var xProbOfImprovement, xRemainingTime = 0.0
-            // includeBestMutantInComparison: we compute the probabilities of getting all fitness values,
-            // but for those smaller than the best mutant, which we know, we use the runtime value
-            // corresponding to the best mutant
-            val minimumFitnessToUse = if (includeBestMutantInComparison) g - (d - g) else -1
-            var i = 0
-            while (i < probOfReachingF.length) {
-              val nextFitness = parentFitness + math.max(i, minimumFitnessToUse)
-              if (nextFitness > parentFitness) {
-                xProbOfImprovement += probOfReachingF(i)
-                xRemainingTime += probOfReachingF(i) * runtimes(nextFitness)
-              }
-              i += 1
-            }
-            dProbability += pOfThisGInAllMutations * xProbOfImprovement
-            dExpectation += pOfThisGInAllMutations * xRemainingTime
-          }
-        }
-
-        g += 1
-      }
-
-      assert(math.abs(1 - dCumulativeSum) < 1e-9, "Total probability is not 1")
-
       // Finally, the probability to flip d bits in mutants is choose(n, d) * mProb^d * (1 - mProb)^(n-d)
       val multipleHere = if (mProb == 1)
         if (n == d) 1.0 else 0.0
       else
         math.exp(MathEx.logChoose(n, d) + d * logMProb + (n - d) * log1MProb) * mutationScale
-      assert(dProbability.isFinite, s"dProbability = $dProbability")
-      assert(multipleHere.isFinite, s"multipleHere = $multipleHere, d = $d, mProb = $mProb")
-      sumP += dProbability * multipleHere
-      sumW += dExpectation * multipleHere
 
-      // ignoreCrossoverParentDuplicates: seems that influences only the expected iteration size
-      val expectedIterationSize = if (ignoreCrossoverParentDuplicates) {
-        populationSize + populationSize * (1 - math.pow(xProb.value, d) - math.pow(1 - xProb.value, d))
-      } else 2.0 * populationSize
+      if (sumP + multipleHere > sumP) {
+        // We need to go from the end: first model the crossover, then mutation atop of it.
+        // Everything about crossover, once d, g, popSize and xProb are fixed, is shared across fitness values
+        // and can be precomputed (or cached), so we do it.
 
-      expectedPopSize += expectedIterationSize * multipleHere
+        var g = 1
+        while (g <= maxG) {
+          // In mutation, the offspring with most good bits flipped wins.
+          // We know we flipped d bits, and there are x bad bits and n-x good bits.
+          // In one run, the probability to flip g good bits is choose(n-x, g) * choose(x, d-g) / choose(n, d)
+          // We may accumulate the probability in popSize runs just immediately, as well as we may collect the result.
+          val pOfThisGInSingleMutation = if (parentFitness < d - g) 0.0 else math.exp(MathEx.logChoose(n - parentFitness, g) + MathEx.logChoose(parentFitness, d - g) - MathEx.logChoose(n, d))
+          val newDCumulativeSum = dCumulativeSum + pOfThisGInSingleMutation
+          val pOfThisGInAllMutations = if (populationSize > 1) math.pow(newDCumulativeSum, populationSize) - math.pow(dCumulativeSum, populationSize) else pOfThisGInSingleMutation
+          dCumulativeSum = newDCumulativeSum
+
+          if (dProbability + pOfThisGInAllMutations > dProbability && (xProb.value < 1 || g > d - g)) {
+            if (xProb.value == 1) {
+              // Everything is flipped, so we basically consider the best mutant.
+              // This is a special quick case, as only one possible offspring is generated
+              val theFitness = g - (d - g)
+              dProbability += pOfThisGInAllMutations
+              dExpectation += pOfThisGInAllMutations * runtimes(parentFitness + theFitness)
+            } else {
+              // Getting the probability of reaching a fitness (probOfReachingF(i) corresponds to fitness x + i)
+              val probOfReachingF = crossoverComputation.compute(d, g, populationSize, xProb)
+              var xProbOfImprovement, xRemainingTime = 0.0
+              // includeBestMutantInComparison: we compute the probabilities of getting all fitness values,
+              // but for those smaller than the best mutant, which we know, we use the runtime value
+              // corresponding to the best mutant
+              val minimumFitnessToUse = if (includeBestMutantInComparison) g - (d - g) else -1
+              var i = 0
+              while (i < probOfReachingF.length) {
+                val nextFitness = parentFitness + math.max(i, minimumFitnessToUse)
+                if (nextFitness > parentFitness) {
+                  xProbOfImprovement += probOfReachingF(i)
+                  xRemainingTime += probOfReachingF(i) * runtimes(nextFitness)
+                }
+                i += 1
+              }
+              dProbability += pOfThisGInAllMutations * xProbOfImprovement
+              dExpectation += pOfThisGInAllMutations * xRemainingTime
+            }
+          }
+
+          g += 1
+        }
+
+        assert(math.abs(1 - dCumulativeSum) < 1e-9, "Total probability is not 1")
+
+        assert(dProbability.isFinite, s"dProbability = $dProbability")
+        assert(multipleHere.isFinite, s"multipleHere = $multipleHere, d = $d, mProb = $mProb")
+        sumP += dProbability * multipleHere
+        sumW += dExpectation * multipleHere
+
+        // ignoreCrossoverParentDuplicates: seems that influences only the expected iteration size
+        val expectedIterationSize = if (ignoreCrossoverParentDuplicates) {
+          populationSize + populationSize * (1 - math.pow(xProb.value, d) - math.pow(1 - xProb.value, d))
+        } else 2.0 * populationSize
+
+        expectedPopSize += expectedIterationSize * multipleHere
+      }
 
       d += 1
     }
