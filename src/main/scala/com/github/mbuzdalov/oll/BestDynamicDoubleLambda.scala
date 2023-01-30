@@ -95,9 +95,10 @@ object BestDynamicDoubleLambda {
               bestValue = myBestValue
               bestLambda = myBestLambda
             }
-          } else if (value0 < value3 * (1 - 1e-12) && value1 < value0 * (1 - 1e-12) || value3 < value0 * (1 - 1e-12) && value2 < value3 * (1 - 1e-12)) {
-            println(s"[ERROR] x=$x, popSize=$popSize: Some serious non-monotone shit happens! $value0, $value1, $value2, $value3")
           } else {
+            if (value0 < value3 * (1 - 1e-12) && value1 < value0 * (1 - 1e-12) || value3 < value0 * (1 - 1e-12) && value2 < value3 * (1 - 1e-12)) {
+              println(s"[ERROR] x=$x, popSize=$popSize: Some serious non-monotone shit happens! $value0, $value1, $value2, $value3")
+            }
             if (value0 < bestValue) {
               bestValue = value0
               bestLambda = smallest
