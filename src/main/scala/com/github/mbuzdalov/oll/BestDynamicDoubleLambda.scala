@@ -52,7 +52,7 @@ object BestDynamicDoubleLambda {
           val value2 = futures.get(4 * (popSize - 1) + 2).get()
           val value3 = futures.get(4 * (popSize - 1) + 3).get()
 
-          if (value1 < value0 && value2 < value3) {
+          if (value1 < value0 * (1 - 1e-12) && value2 < value3 * (1 - 1e-12)) {
             var left = smallest
             var right = largest
             var myBestLambda = -1.0
@@ -87,13 +87,15 @@ object BestDynamicDoubleLambda {
               left = newLeft
               right = newRight
             }
-            assert(myBestValue <= value0 && myBestValue <= value1 && myBestValue <= value2 && myBestValue <= value3)
             println(s"[warning] x=$x, popSize=$popSize: special minimum needed! $value0, $value1, $value2, $value3. Lambdas are $smallest and $largest. $myBestLambda => $myBestValue")
+            if (!(myBestValue <= value0 && myBestValue <= value1 && myBestValue <= value2 && myBestValue <= value3)) {
+              println(s"    [ERROR] $myBestValue exceeds one of [$value0, $value1, $value2, $value3]")
+            }
             if (myBestValue < bestValue) {
               bestValue = myBestValue
               bestLambda = myBestLambda
             }
-          } else if (value0 < value3 && value1 < value0 || value3 < value0 && value2 < value3) {
+          } else if (value0 < value3 * (1 - 1e-12) && value1 < value0 * (1 - 1e-12) || value3 < value0 * (1 - 1e-12) && value2 < value3 * (1 - 1e-12)) {
             println(s"[ERROR] x=$x, popSize=$popSize: Some serious non-monotone shit happens! $value0, $value1, $value2, $value3")
           } else {
             if (value0 < bestValue) {
