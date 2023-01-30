@@ -24,7 +24,6 @@ object BestDynamicDoubleLambda {
       var x = n
       while (x > 0) {
         x -= 1
-        // Choosing best discrete lambda
         var bestLambda = 0.0
         var bestValue = Double.PositiveInfinity
 
