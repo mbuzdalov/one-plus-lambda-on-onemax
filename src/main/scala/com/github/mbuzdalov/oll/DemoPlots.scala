@@ -138,7 +138,7 @@ object DemoPlots {
   }
 
   def main(args: Array[String]): Unit = {
-    //varyingLastLambda()
+    varyingLastLambda()
     varyingLastTwoLambdas()
   }
 }
