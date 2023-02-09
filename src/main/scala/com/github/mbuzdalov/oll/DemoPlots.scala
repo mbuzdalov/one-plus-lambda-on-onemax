@@ -1,6 +1,10 @@
 package com.github.mbuzdalov.oll
 
+import java.io.PrintWriter
 import java.util.concurrent.{Callable, ScheduledThreadPoolExecutor}
+
+import scala.jdk.CollectionConverters._
+import scala.util.Using
 
 import com.github.mbuzdalov.oll.xover.LegacyCollectiveCrossoverComputation
 
@@ -21,54 +25,50 @@ object DemoPlots {
       ignoreCrossoverParentDuplicates = true, //cmd.getBoolean("ignore-crossover-parent-duplicates"),
       crossoverComputation = crossoverComputation)
 
-    println("lambda,popSize,runtime")
-
     val popSizes = lambdas.map(v => math.round(v).toInt)
     val lastIdx = lambdas.length - 1
 
-    val tasks = new java.util.ArrayList[Callable[Unit]]
+    case class Result(popSize: Int, lambda: Double, result: Double)
+    val maxPopSize = 40
+    val allLastLambdas = ((10 to maxPopSize * 10).map(_ / 10.0) ++ (10 to maxPopSize * 10).filter(_ % 10 == 5).map(v => math.nextDown(v / 10.0))).sorted
+    val allPopSizes = 1 to maxPopSize
 
-    for (last <- 10 to 300) {
-      if (last % 10 == 5) {
-        tasks.add(() => {
-          val lambda = math.nextDown(last / 10.0)
-          val myLambdas = lambdas.clone()
-          val myPopSizes = popSizes.clone()
-          myLambdas(lastIdx) = lambda
-          myPopSizes(lastIdx) = math.round(lambda).toInt
-          val result = RunGivenLambdas.run(n, bins, myLambdas, myPopSizes, ollComputation)
-          DemoPlots.synchronized(println(s"$lambda,rounding,$result"))
-        })
-      }
+    val tasks = new java.util.ArrayList[Callable[Result]]
 
+    for (popSize <- allPopSizes; lastLambda <- allLastLambdas) {
       tasks.add(() => {
         val myLambdas = lambdas.clone()
         val myPopSizes = popSizes.clone()
-        val lambda = last / 10.0
-        myLambdas(lastIdx) = lambda
-        myPopSizes(lastIdx) = math.round(lambda).toInt
+        myLambdas(lastIdx) = lastLambda
+        myPopSizes(lastIdx) = popSize
         val result = RunGivenLambdas.run(n, bins, myLambdas, myPopSizes, ollComputation)
-        DemoPlots.synchronized(println(s"$lambda,rounding,$result"))
+        System.err.println(s"[debug] popSize = $popSize, lastLambda = $lastLambda, result = $result")
+        Result(popSize, lastLambda, result)
       })
     }
 
-    for (popSize <- 1 to 30) {
-      for (lambda10 <- 10 to 300) {
-        tasks.add(() => {
-          val myLambdas = lambdas.clone()
-          val myPopSizes = popSizes.clone()
-          val lambda = lambda10 / 10.0
-          myLambdas(lastIdx) = lambda
-          myPopSizes(lastIdx) = popSize
-          val result = RunGivenLambdas.run(n, bins, myLambdas, myPopSizes, ollComputation)
-          DemoPlots.synchronized(println(s"$lambda,$popSize,$result"))
-        })
+    val pool = new ScheduledThreadPoolExecutor(Runtime.getRuntime.availableProcessors())
+    val results = pool.invokeAll(tasks).asScala.map(_.get())
+    pool.shutdown()
+
+    Using.resource(new PrintWriter("oll-binning-n500-last-lambda-v1.csv")) { out =>
+      out.println("lambda,popSize,runtime")
+      for (Result(popSize, lambda, result) <- results) {
+        out.println(s"$lambda,$popSize,$result")
+        if (math.round(lambda) == popSize) {
+          out.println(s"$lambda,rounding,$result")
+        }
       }
     }
-
-    val pool = new ScheduledThreadPoolExecutor(Runtime.getRuntime.availableProcessors())
-    pool.invokeAll(tasks)
-    pool.shutdown()
+    Using.resource(new PrintWriter("oll-binning-n500-last-lambda-v2.csv")) { out =>
+      out.println(allPopSizes.mkString("lambda,", ",", ",rounding"))
+      for (lastLambda <- allLastLambdas) {
+        val resultsFiltered = results.filter(_.lambda == lastLambda)
+        assert(allPopSizes.indices.forall(i => allPopSizes(i) == resultsFiltered(i).popSize), resultsFiltered.map(_.popSize).mkString(","))
+        val roundedPopSize = math.round(lastLambda).toInt
+        out.println(resultsFiltered.map(_.result).mkString(s"$lastLambda,", ",", s",${resultsFiltered(roundedPopSize - 1).result}"))
+      }
+    }
   }
 
   def main(args: Array[String]): Unit = {
