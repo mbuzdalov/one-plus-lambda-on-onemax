@@ -38,20 +38,20 @@ class OLLComputation(val n: Int,
     val log1MProb = math.log1p(-mProb)
 
     var sumW, sumP = 0.0
-    var expectedPopSize = 0.0
+    var expectedIterationBudget = 0.0
 
     // neverMutateZeroBits #1: we divide the probability of flipping exactly d bits by 1-(1-mProb)^n.
     val mutationScale = if (neverMutateZeroBits)
       1 / (1 - math.exp(n * log1MProb))
     else 1
 
-    // neverMutateZeroBits #2: the expected population size needs to take into account d = 0
+    // neverMutateZeroBits #2: the expected iteration budget needs to take into account d = 0
     if (!neverMutateZeroBits) {
       val probability = math.exp(n * log1MProb)
       if (ignoreCrossoverParentDuplicates) {
-        expectedPopSize += probability * populationSize // all mutations happen, all crossovers ignored
+        expectedIterationBudget += probability * populationSize // all mutations happen, all crossovers ignored
       } else {
-        expectedPopSize += probability * 2 * populationSize // all mutations happen, all crossovers happen
+        expectedIterationBudget += probability * 2 * populationSize // all mutations happen, all crossovers happen
       }
     }
 
@@ -130,7 +130,7 @@ class OLLComputation(val n: Int,
           populationSize + populationSize * (1 - math.pow(xProb.value, d) - math.pow(1 - xProb.value, d))
         } else 2.0 * populationSize
 
-        expectedPopSize += expectedIterationSize * multipleHere
+        expectedIterationBudget += expectedIterationSize * multipleHere
       }
 
       d += 1
@@ -145,8 +145,8 @@ class OLLComputation(val n: Int,
     }
 
     // The final result is straightforward: we wait until success, then go the chosen way,
-    // assuming we spend `expectedPopSize` fitness evaluations in each iteration
-    (sumW + expectedPopSize) / sumP
+    // assuming we spend `expectedIterationBudget` fitness evaluations in each iteration
+    (sumW + expectedIterationBudget) / sumP
   }
 
   def logConfiguration(out: PrintWriter): Unit = {
