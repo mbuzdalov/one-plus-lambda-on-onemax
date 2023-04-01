@@ -17,6 +17,31 @@ object RunGivenLambdas {
     MathEx.expectedRuntimeOnBitStrings(n, runtimes)
   }
 
+  def runSmooth(n: Int, bins: Seq[Int], lambdas: Int => Double, populationSizes: Int => Double, ollComputation: OLLComputation): Double = {
+    val runtimes = new Array[Double](n + 1)
+    for (i <- bins.size - 2 to 0 by -1) {
+      val lambda = lambdas(i)
+      val populationSize = populationSizes(i)
+      val populationSizeSmallV = math.floor(populationSize).toInt
+      val populationSizeLargeV = math.ceil(populationSize).toInt
+      if (populationSizeSmallV == populationSizeLargeV) {
+        for (f <- bins(i + 1) - 1 to bins(i) by -1) {
+          runtimes(f) = ollComputation.findRuntime(f, lambda, populationSizeSmallV, runtimes).toDouble
+        }
+      } else {
+        val probabilitySmall = populationSizeLargeV - populationSize
+        val probabilityLarge = populationSize - populationSizeSmallV
+
+        for (f <- bins(i + 1) - 1 to bins(i) by -1) {
+          val resultSmall = ollComputation.findRuntime(f, lambda, populationSizeSmallV, runtimes)
+          val resultLarge = ollComputation.findRuntime(f, lambda, populationSizeLargeV, runtimes)
+          runtimes(f) = (resultSmall * probabilitySmall + resultLarge * probabilityLarge).toDouble
+        }
+      }
+    }
+    MathEx.expectedRuntimeOnBitStrings(n, runtimes)
+  }
+
   def main(args: Array[String]): Unit = {
     val cmd = new CommandLineArgs(args)
     val n = cmd.getInt("n")

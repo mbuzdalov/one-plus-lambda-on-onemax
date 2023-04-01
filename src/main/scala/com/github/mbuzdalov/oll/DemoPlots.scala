@@ -113,6 +113,16 @@ object DemoPlots {
       })
     }
 
+    for (lastLambda <- allLastLambdas) {
+      tasks.add(() => {
+        val myLambdas = lambdas.clone()
+        myLambdas(lastIdx) = lastLambda
+        val result = RunGivenLambdas.runSmooth(n, bins, myLambdas, myLambdas, ollComputation)
+        System.err.println(s"[debug] smooth, lastLambda = $lastLambda, result = $result")
+        Result(-1, lastLambda, result)
+      })
+    }
+
     val pool = new ScheduledThreadPoolExecutor(Runtime.getRuntime.availableProcessors())
     val results = pool.invokeAll(tasks).asScala.map(_.get())
     pool.shutdown()
@@ -120,25 +130,30 @@ object DemoPlots {
     Using.resource(new PrintWriter("oll-binning-n500-last-lambda-v1.csv")) { out =>
       out.println("lambda,popSize,runtime")
       for (Result(popSize, lambda, result) <- results) {
-        out.println(s"$lambda,$popSize,$result")
+        if (popSize == -1) {
+          out.println(s"$lambda,smoothing,$result")
+        } else {
+          out.println(s"$lambda,$popSize,$result")
+        }
         if (math.round(lambda) == popSize) {
           out.println(s"$lambda,rounding,$result")
         }
       }
     }
     Using.resource(new PrintWriter("oll-binning-n500-last-lambda-v2.csv")) { out =>
-      out.println(allPopSizes.mkString("lambda,", ",", ",rounding"))
+      out.println(allPopSizes.mkString("lambda,", ",", ",rounding,smoothing"))
       for (lastLambda <- allLastLambdas) {
         val resultsFiltered = results.filter(_.lambda == lastLambda)
         assert(allPopSizes.indices.forall(i => allPopSizes(i) == resultsFiltered(i).popSize), resultsFiltered.map(_.popSize).mkString(","))
+        assert(resultsFiltered.last.popSize == -1)
         val roundedPopSize = math.round(lastLambda).toInt
-        out.println(resultsFiltered.map(_.result).mkString(s"$lastLambda,", ",", s",${resultsFiltered(roundedPopSize - 1).result}"))
+        out.println(resultsFiltered.map(_.result).mkString(s"$lastLambda,", ",", s",${resultsFiltered(roundedPopSize - 1).result},${resultsFiltered.last.result}"))
       }
     }
   }
 
   def main(args: Array[String]): Unit = {
     varyingLastLambda()
-    varyingLastTwoLambdas()
+//    varyingLastTwoLambdas()
   }
 }
