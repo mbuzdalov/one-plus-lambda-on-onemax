@@ -35,10 +35,10 @@ object BestDynamicDoubleLambda {
         for (popSize <- 1 to n) {
           val smallest = smallestLambda(popSize)
           val largest = largestLambda(popSize)
-          tasks.add(() => ollComputation.findRuntime(parentFitness = x, lambda = smallest, populationSize = popSize, runtimes = runtimes))
-          tasks.add(() => ollComputation.findRuntime(parentFitness = x, lambda = smallest + eps, populationSize = popSize, runtimes = runtimes))
-          tasks.add(() => ollComputation.findRuntime(parentFitness = x, lambda = largest - eps, populationSize = popSize, runtimes = runtimes))
-          tasks.add(() => ollComputation.findRuntime(parentFitness = x, lambda = largest, populationSize = popSize, runtimes = runtimes))
+          tasks.add(() => ollComputation.findRuntime(parentFitness = x, lambda = smallest, populationSize = popSize, runtimes = runtimes).toDouble)
+          tasks.add(() => ollComputation.findRuntime(parentFitness = x, lambda = smallest + eps, populationSize = popSize, runtimes = runtimes).toDouble)
+          tasks.add(() => ollComputation.findRuntime(parentFitness = x, lambda = largest - eps, populationSize = popSize, runtimes = runtimes).toDouble)
+          tasks.add(() => ollComputation.findRuntime(parentFitness = x, lambda = largest, populationSize = popSize, runtimes = runtimes).toDouble)
         }
         val futures = pool.invokeAll(tasks)
         tasks.clear()
@@ -64,7 +64,7 @@ object BestDynamicDoubleLambda {
               iteration -= 1
               for (t <- 0 until pieces) {
                 val thisLambda = (left * (pieces - t) + right * (t + 1)) / (pieces + 1)
-                tasks.add(() => nonCachingComputation.findRuntime(parentFitness = x, lambda = thisLambda, populationSize = popSize, runtimes = runtimes))
+                tasks.add(() => nonCachingComputation.findRuntime(parentFitness = x, lambda = thisLambda, populationSize = popSize, runtimes = runtimes).toDouble)
               }
               val ternaryFutures = pool.invokeAll(tasks)
               tasks.clear()

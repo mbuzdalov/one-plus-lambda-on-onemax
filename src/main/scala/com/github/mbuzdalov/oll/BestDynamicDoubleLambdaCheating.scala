@@ -33,10 +33,10 @@ object BestDynamicDoubleLambdaCheating {
         def schedulePopSize(popSize: Int): Future[(Double, Double)] = pool2.submit(() => {
           val smallest = smallestLambda(popSize)
           val largest = largestLambda(popSize)
-          val task0 = pool.submit(() => ollComputation.findRuntime(parentFitness = x, lambda = smallest, populationSize = popSize, runtimes = runtimes))
-          val task1 = pool.submit(() => ollComputation.findRuntime(parentFitness = x, lambda = smallest + eps, populationSize = popSize, runtimes = runtimes))
-          val task2 = pool.submit(() => ollComputation.findRuntime(parentFitness = x, lambda = largest - eps, populationSize = popSize, runtimes = runtimes))
-          val task3 = pool.submit(() => ollComputation.findRuntime(parentFitness = x, lambda = largest, populationSize = popSize, runtimes = runtimes))
+          val task0 = pool.submit(() => ollComputation.findRuntime(parentFitness = x, lambda = smallest, populationSize = popSize, runtimes = runtimes).toDouble)
+          val task1 = pool.submit(() => ollComputation.findRuntime(parentFitness = x, lambda = smallest + eps, populationSize = popSize, runtimes = runtimes).toDouble)
+          val task2 = pool.submit(() => ollComputation.findRuntime(parentFitness = x, lambda = largest - eps, populationSize = popSize, runtimes = runtimes).toDouble)
+          val task3 = pool.submit(() => ollComputation.findRuntime(parentFitness = x, lambda = largest, populationSize = popSize, runtimes = runtimes).toDouble)
           val value0 = task0.get()
           val value1 = task1.get()
           val value2 = task2.get()
@@ -56,7 +56,7 @@ object BestDynamicDoubleLambdaCheating {
               val tasks = new java.util.ArrayList[Callable[Double]](n)
               for (t <- 0 until pieces) {
                 val thisLambda = (left * (pieces - t) + right * (t + 1)) / (pieces + 1)
-                tasks.add(() => nonCachingComputation.findRuntime(parentFitness = x, lambda = thisLambda, populationSize = popSize, runtimes = runtimes))
+                tasks.add(() => nonCachingComputation.findRuntime(parentFitness = x, lambda = thisLambda, populationSize = popSize, runtimes = runtimes).toDouble)
               }
               val ternaryFutures = pool.invokeAll(tasks)
               tasks.clear()

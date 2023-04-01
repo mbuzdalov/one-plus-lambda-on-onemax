@@ -11,7 +11,7 @@ object RunGivenLambdas {
       val lambda = lambdas(i)
       val populationSize = populationSizes(i)
       for (f <- bins(i + 1) - 1 to bins(i) by -1) {
-        runtimes(f) = ollComputation.findRuntime(f, lambda, populationSize, runtimes)
+        runtimes(f) = ollComputation.findRuntime(f, lambda, populationSize, runtimes).toDouble
       }
     }
     MathEx.expectedRuntimeOnBitStrings(n, runtimes)

@@ -30,7 +30,7 @@ class OLLComputation(val n: Int,
    * @param runtimes the runtimes for given fitness values.
    * @return the runtime for the given parameters.
    */
-  def findRuntime(parentFitness: Int, lambda: Double, populationSize: Int, runtimes: Array[Double]): Double = {
+  def findRuntime(parentFitness: Int, lambda: Double, populationSize: Int, runtimes: Array[Double]): ExpectedWaitingTime = {
     val mProb = lambda / n
     val xProb = AugmentedProbability(1 / lambda)
 
@@ -146,7 +146,7 @@ class OLLComputation(val n: Int,
 
     // The final result is straightforward: we wait until success, then go the chosen way,
     // assuming we spend `expectedIterationBudget` fitness evaluations in each iteration
-    (sumW + expectedIterationBudget) / sumP
+    ExpectedWaitingTime(updateProbability = sumP, conditionedExpectation = sumW + expectedIterationBudget)
   }
 
   def logConfiguration(out: PrintWriter): Unit = {

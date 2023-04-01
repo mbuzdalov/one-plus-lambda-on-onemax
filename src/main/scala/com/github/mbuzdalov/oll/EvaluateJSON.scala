@@ -14,7 +14,7 @@ object EvaluateJSON {
     for (f <- n - 1 to 0 by -1) {
       val lambda = lambdas(f)
       val populationSize = populationSizes(f)
-      runtimes(f) = ollComputation.findRuntime(f, lambda, populationSize, runtimes)
+      runtimes(f) = ollComputation.findRuntime(f, lambda, populationSize, runtimes).toDouble
     }
     MathEx.expectedRuntimeOnBitStrings(n, runtimes)
   }
