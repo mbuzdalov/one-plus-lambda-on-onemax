@@ -77,6 +77,7 @@ object BestBinnedSmoothLambda {
         ignoreCrossoverParentDuplicates = cmd.getBoolean("ignore-crossover-parent-duplicates"),
         crossoverComputation = crossoverComputation)
     })
+    assert(tlComputation.get() != null)
 
     val wayToRun = cmd.getString("way-to-run", " (expected 'non-smooth', 'smooth', 'independent'") match {
       case "non-smooth" => NonSmooth
