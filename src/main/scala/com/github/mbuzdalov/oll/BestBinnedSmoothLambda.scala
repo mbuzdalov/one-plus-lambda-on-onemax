@@ -48,8 +48,11 @@ object BestBinnedSmoothLambda {
   }
 
 
-  private def run(n: Int, bins: Seq[Int], lambdaGens: Array[Double], tlComputation: ThreadLocal[OLLComputation], way: WayToRun): Double =
-    way.run(n, bins, lambdaGens, tlComputation.get())
+  private def run(n: Int, bins: Seq[Int], lambdaGens: Array[Double], tlComputation: ThreadLocal[OLLComputation], way: WayToRun): Double = {
+    val ollComp = tlComputation.get()
+    ollComp.crossoverComputation.clear()
+    way.run(n, bins, lambdaGens, ollComp)
+  }
 
   private def optimize(n: Int, tlComputation: ThreadLocal[OLLComputation], bins: Seq[Int], pool: ScheduledThreadPoolExecutor, way: WayToRun)
                       (a: Array[NumericMinimization.CMAIndividual]): Unit = {
