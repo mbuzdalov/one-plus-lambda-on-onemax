@@ -13,6 +13,7 @@
 hs_err_pid*
 
 # IntelliJ IDEA stuff
+.bsp/
 .idea/
 /out/
 /project/build.properties
