@@ -73,14 +73,26 @@ object BestBinnedDoubleLambda {
     })
 
     val bins = RunGivenLambdas.defaultBins(n)
-    val lambdaTable = data.drop(1).map(line => line.split(',')(1).toDouble).reverse
-    val rawLambdaValues = new Array[Double](2 * (bins.length - 1))
-    for (i <- 0 until bins.length - 1) {
-      val sum = lambdaTable.indices.filter(j => bins(i) <= j && j < bins(i + 1)).map(lambdaTable).sum
-      val lambda = if (i == 0) 1 else sum / (bins(i + 1) - bins(i))
-      lambdaToParts(lambda, rawLambdaValues, i, n)
-    }
     println(s"Bins: ${bins.mkString(", ")}")
+    val rawLambdaValues = new Array[Double](2 * (bins.length - 1))
+
+    cmd.getStringOption("initial-value") match {
+      case Some(initialValueStr) =>
+        val tokenizer = new ju.StringTokenizer(initialValueStr, ",")
+        if (tokenizer.countTokens() != bins.length - 1)
+          throw new IllegalArgumentException(s"Number of tokens in initial-value should equal ${bins.length - 1}")
+        for (i <- 0 until bins.length - 1) {
+          val lambda = tokenizer.nextToken().toDouble
+          lambdaToParts(lambda, rawLambdaValues, i, n)
+        }
+      case None =>
+        val lambdaTable = data.drop(1).map(line => line.split(',')(1).toDouble).reverse
+        for (i <- 0 until bins.length - 1) {
+          val sum = lambdaTable.indices.filter(j => bins(i) <= j && j < bins(i + 1)).map(lambdaTable).sum
+          val lambda = if (i == 0) 1 else sum / (bins(i + 1) - bins(i))
+          lambdaToParts(lambda, rawLambdaValues, i, n)
+        }
+    }
 
     val pool = new ScheduledThreadPoolExecutor(Runtime.getRuntime.availableProcessors())
     val (result, fitness) = NumericMinimization.optimizeDistributionBySeparableCMAES(
