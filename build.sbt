@@ -1,7 +1,7 @@
 lazy val commonSettings = Seq(
   organization := "com.github.mbuzdalov",
   libraryDependencies ++= Seq(scalaTest, spire),
-  scalaVersion := "2.13.11",
+  scalaVersion := "2.13.12",
   scalacOptions ++= Seq("-deprecation"),
   fork := true
 )
