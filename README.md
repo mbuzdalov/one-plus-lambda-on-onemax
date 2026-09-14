@@ -11,7 +11,10 @@ Buzdalov M., Doerr C. Optimal Static Mutation Strength Distributions for the (1+
 // Proceedings of Genetic and Evolutionary Computation Conference -- 2021 -- P.660-668.
 
 Vinokurov D., Buzdalov M. On Optimal Static and Dynamic Parameter Choices for Fixed-Target Optimization.
-// Proceedings of Genetic and Evolutionary Computation Conference -- 2022.
+// Proceedings of Genetic and Evolutionary Computation Conference -- 2022 -- P. 876-883.
+
+Chen D., Buzdalov M., Doerr C., Dang N. Using Automated Algorithm Configuration for Parameter Control.
+// Foundations of Genetic Algorithms -- 2023 -- P. 38-49
 
 # Motivation
 
