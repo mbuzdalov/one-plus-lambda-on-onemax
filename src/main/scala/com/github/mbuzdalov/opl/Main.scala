@@ -13,15 +13,15 @@ import com.github.mbuzdalov.opl.computation.{DriftOptimalRunningTime, OptimalRun
 import com.github.mbuzdalov.opl.distribution.{FlipKBits, ShiftBitMutation, StandardBitMutation}
 import com.github.mbuzdalov.opl.picture.RelativeOptimalityPictureBuilder
 
-object Main {
-  def optimalValuesComparison(args: Array[String]): Unit = {
+object Main:
+  private def optimalValuesComparison(args: Array[String]): Unit =
     val targetRoot = Paths.get(args(0))
     Files.createDirectories(targetRoot)
     val nValues = args(1).split(',').map(_.toInt)
     val maxLambda = args(2).toInt
-    Using.resource(Files.newBufferedWriter(targetRoot.resolve(s"expected-times.csv"))) { times =>
+    Using.resource(Files.newBufferedWriter(targetRoot.resolve(s"expected-times.csv"))): times =>
       times.write("n,lambda,optimal,drift-optimal,standard-optimal,shift-optimal\n")
-      for (n <- nValues; lambda <- 1 to maxLambda) {
+      for n <- nValues; lambda <- 1 to maxLambda do
         val t0 = timer(s"[n=$n, lambda=$lambda] Creating listeners...")
         val optimalListener = OptimalRunningTime.newListener(FlipKBits)
         val driftOptimalListener = DriftOptimalRunningTime.newListener(FlipKBits)
@@ -43,24 +43,21 @@ object Main {
         times.write(s"$n,$lambda,${optimalResult.expectedRunningTime},${driftOptimalResult.expectedRunningTime},")
         times.write(s"${standardOptimalResult.expectedRunningTime},${shiftOptimalResult.expectedRunningTime}\n")
         t2.done()
-      }
-    }
-  }
 
-  def mainRuns(args: Array[String]): Unit = {
+  private def mainRuns(args: Array[String]): Unit =
     val targetRoot = Paths.get(args(0))
     Files.createDirectories(targetRoot)
     val nValues = args(1).split(',').map(_.toInt)
     val lambdaValues = args(2).split(',').map(_.toInt)
 
-    Using.resource(Files.newBufferedWriter(targetRoot.resolve("expectations.csv"))) { exps =>
+    Using.resource(Files.newBufferedWriter(targetRoot.resolve("expectations.csv"))): exps =>
       exps.write("n,lambda,optimal rls,drift optimal rls,optimal sbm,optimal shf\n")
 
       Using.resources(Files.newBufferedWriter(targetRoot.resolve("optimal-rls.csv")),
         Files.newBufferedWriter(targetRoot.resolve("drift-optimal-rls.csv")),
         Files.newBufferedWriter(targetRoot.resolve("optimal-sbm.csv")),
         Files.newBufferedWriter(targetRoot.resolve("optimal-shf.csv"))
-      ) { (opt, drift, std, shf) =>
+      ): (opt, drift, std, shf) =>
         opt.write("n,lambda,distance,value,time\n")
         drift.write("n,lambda,distance,value,time\n")
         std.write("n,lambda,distance,value,time\n")
@@ -68,8 +65,8 @@ object Main {
 
         val theLock = new AnyRef
 
-        class Task(n: Int, lambda: Int) extends Callable[Unit] {
-          override def call(): Unit = {
+        class Task(n: Int, lambda: Int) extends Callable[Unit]:
+          override def call(): Unit =
             val allBitFlips = Array.tabulate(n)(i => i + 1)
             val probabilities = Array.tabulate(151)(i => math.pow(2, (i - 50) / 5.0) / n).filter(_ < 1)
 
@@ -80,13 +77,13 @@ object Main {
               new RelativeOptimalityPictureBuilder(targetRoot.resolve(s"optimal-rls-$n-$lambda.png"), 1, n, wrapRLS),
               new RelativeOptimalityPictureBuilder(targetRoot.resolve(s"optimal-sbm-$n-$lambda.png"), 1, n, wrapSBM),
               new RelativeOptimalityPictureBuilder(targetRoot.resolve(s"optimal-shf-$n-$lambda.png"), 1, n, wrapSHF),
-            ) { (_, _, _) =>
+            ): (_, _, _) =>
               Using.resources(
                 new NonMonotonicitySliceSearch(targetRoot.resolve(s"optimal-sbm-$n-$lambda.slice-non-monotone"), n / 2),
                 new NonMonotonicitySliceSearch(targetRoot.resolve(s"optimal-shf-$n-$lambda.slice-non-monotone"), n / 2),
                 new NonMonotonicityInDistanceSearch(targetRoot.resolve(s"optimal-rls-$n-$lambda.param-non-monotone")),
                 new NonMonotonicityInDistanceSearch(targetRoot.resolve(s"drift-rls-$n-$lambda.param-non-monotone")),
-              ) { (nmSBM, nmSHF, nmRLS, nmRLSd) =>
+              ): (nmSBM, nmSHF, nmRLS, nmRLSd) =>
                 wrapRLS.add(nmRLS)
                 wrapSBM.add(nmSBM)
                 wrapSHF.add(nmSHF)
@@ -109,43 +106,29 @@ object Main {
                 val optimalRLSd= driftOptimalListener.toResult
                 val optimalSBM = optimalStandardListener.toResult
                 val optimalSHF = optimalShiftListener.toResult
-                theLock.synchronized {
-                  for (distance <- 1 to n) {
+                theLock.synchronized:
+                  for distance <- 1 to n do
                     opt.write(s"$n,$lambda,$distance,${optimalRLS.optimalParameter(distance)},${optimalRLS.optimalExpectation(distance)}\n")
                     drift.write(s"$n,$lambda,$distance,${optimalRLSd.optimalParameter(distance)},${optimalRLSd.optimalExpectation(distance)}\n")
                     std.write(s"$n,$lambda,$distance,${optimalSBM.optimalParameter(distance)},${optimalSBM.optimalExpectation(distance)}\n")
                     shf.write(s"$n,$lambda,$distance,${optimalSHF.optimalParameter(distance)},${optimalSHF.optimalExpectation(distance)}\n")
-                  }
                   exps.write(s"$n,$lambda,${optimalRLS.expectedRunningTime},${optimalRLSd.expectedRunningTime},${optimalSBM.expectedRunningTime},${optimalSHF.expectedRunningTime}\n")
-                }
-              }
-            }
-          }
-        }
 
-        val tasks = new JArrayList[Task]()
-        for (n <- nValues; lambda <- lambdaValues) tasks.add(new Task(n, lambda))
+        val tasks = JArrayList[Task]()
+        for n <- nValues; lambda <- lambdaValues do tasks.add(Task(n, lambda))
         val pool = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors())
         val futures = pool.invokeAll(tasks)
         futures.asScala.foreach(_.get())
         pool.shutdown()
         pool.awaitTermination(1, TimeUnit.HOURS)
-      }
-    }
-  }
 
-  def main(args: Array[String]): Unit = args(0) match {
+  def main(args: Array[String]): Unit = args(0) match
     case "main" => mainRuns(args.tail)
     case "optimal-comparison" => optimalValuesComparison(args.tail)
-  }
 
-  case class timer(message: String) {
+  private case class timer(message: String):
     private val t0 = System.nanoTime()
 
-    def done(): Unit = {
-      Main.synchronized {
+    def done(): Unit =
+      Main.synchronized:
         println(f"$message done in ${(System.nanoTime() - t0) * 1e-9}%.3f s")
-      }
-    }
-  }
-}

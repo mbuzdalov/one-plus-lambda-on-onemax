@@ -1,7 +1,8 @@
 package com.github.mbuzdalov.oll
 
-import java.io.PrintWriter
+import com.github.mbuzdalov.util.Loops.{loopFromTo, loopFromUntil}
 
+import java.io.PrintWriter
 import com.github.mbuzdalov.util.MathEx
 
 /**
@@ -20,7 +21,7 @@ class OLLComputation(val n: Int,
                      val neverMutateZeroBits: Boolean,
                      val includeBestMutantInComparison: Boolean,
                      val ignoreCrossoverParentDuplicates: Boolean,
-                     val crossoverComputation: CrossoverComputation) {
+                     val crossoverComputation: CrossoverComputation):
   /**
    * Finds the runtime assuming the parent's fitness, the value of lambda, and the runtimes for all higher fitness
    * values are given.
@@ -30,7 +31,7 @@ class OLLComputation(val n: Int,
    * @param runtimes the runtimes for given fitness values.
    * @return the runtime for the given parameters.
    */
-  def findRuntime(parentFitness: Int, lambda: Double, populationSize: Int, runtimes: Array[Double]): ExpectedWaitingTime = {
+  def findRuntime(parentFitness: Int, lambda: Double, populationSize: Int, runtimes: Array[Double]): ExpectedWaitingTime =
     val mProb = lambda / n
     val xProb = AugmentedProbability(1 / lambda)
 
@@ -41,59 +42,52 @@ class OLLComputation(val n: Int,
     var expectedIterationBudget = 0.0
 
     // neverMutateZeroBits #1: we divide the probability of flipping exactly d bits by 1-(1-mProb)^n.
-    val mutationScale = if (neverMutateZeroBits)
-      1 / (1 - math.exp(n * log1MProb))
-    else 1
+    val mutationScale = if neverMutateZeroBits then 1 / (1 - math.exp(n * log1MProb)) else 1
 
     // neverMutateZeroBits #2: the expected iteration budget needs to take into account d = 0
-    if (!neverMutateZeroBits) {
+    if !neverMutateZeroBits then
       val probability = math.exp(n * log1MProb)
-      if (ignoreCrossoverParentDuplicates) {
-        expectedIterationBudget += probability * populationSize // all mutations happen, all crossovers ignored
-      } else {
-        expectedIterationBudget += probability * 2 * populationSize // all mutations happen, all crossovers happen
-      }
-    }
+      expectedIterationBudget += (
+        if ignoreCrossoverParentDuplicates 
+          then probability * populationSize  // all mutations happen, all crossovers ignored
+          else probability * 2 * populationSize // all mutations happen, all crossovers happen
+      )
 
     // All that we do we condition on the distance between the parent and offspring.
-    var d = 1
-    while (d <= n) {
-
+    loopFromTo(1, n): d =>  
       // The maximum number of good bits to be flipped
       val maxG = math.min(d, n - parentFitness)
       var dProbability, dExpectation = 0.0
-      var dCumulativeSum = if (parentFitness < d) 0.0 else math.exp(MathEx.logChoose(parentFitness, d) - MathEx.logChoose(n, d))
+      var dCumulativeSum = if parentFitness < d then 0.0 else math.exp(MathEx.logChoose(parentFitness, d) - MathEx.logChoose(n, d))
 
       // Finally, the probability to flip d bits in mutants is choose(n, d) * mProb^d * (1 - mProb)^(n-d)
-      val multipleHere = if (mProb == 1)
-        if (n == d) 1.0 else 0.0
-      else
-        math.exp(MathEx.logChoose(n, d) + d * logMProb + (n - d) * log1MProb) * mutationScale
+      val multipleHere = if mProb == 1 then
+        if n == d then 1.0 else 0.0
+      else math.exp(MathEx.logChoose(n, d) + d * logMProb + (n - d) * log1MProb) * mutationScale
 
-      if (sumP + multipleHere > sumP) {
+      if sumP + multipleHere > sumP then
         // We need to go from the end: first model the crossover, then mutation atop of it.
         // Everything about crossover, once d, g, popSize and xProb are fixed, is shared across fitness values
         // and can be precomputed (or cached), so we do it.
 
-        var g = 1
-        while (g <= maxG) {
+        loopFromTo(1, maxG): g =>
           // In mutation, the offspring with most good bits flipped wins.
           // We know we flipped d bits, and there are x bad bits and n-x good bits.
           // In one run, the probability to flip g good bits is choose(n-x, g) * choose(x, d-g) / choose(n, d)
           // We may accumulate the probability in popSize runs just immediately, as well as we may collect the result.
-          val pOfThisGInSingleMutation = if (parentFitness < d - g) 0.0 else math.exp(MathEx.logChoose(n - parentFitness, g) + MathEx.logChoose(parentFitness, d - g) - MathEx.logChoose(n, d))
+          val pOfThisGInSingleMutation = if parentFitness < d - g then 0.0 else math.exp(MathEx.logChoose(n - parentFitness, g) + MathEx.logChoose(parentFitness, d - g) - MathEx.logChoose(n, d))
           val newDCumulativeSum = dCumulativeSum + pOfThisGInSingleMutation
-          val pOfThisGInAllMutations = if (populationSize > 1) math.pow(newDCumulativeSum, populationSize) - math.pow(dCumulativeSum, populationSize) else pOfThisGInSingleMutation
+          val pOfThisGInAllMutations = if populationSize > 1 then math.pow(newDCumulativeSum, populationSize) - math.pow(dCumulativeSum, populationSize) else pOfThisGInSingleMutation
           dCumulativeSum = newDCumulativeSum
 
-          if (dProbability + pOfThisGInAllMutations > dProbability && (xProb.value < 1 || g > d - g)) {
-            if (xProb.value == 1) {
+          if dProbability + pOfThisGInAllMutations > dProbability && (xProb.value < 1 || g > d - g) then
+            if xProb.value == 1 then
               // Everything is flipped, so we basically consider the best mutant.
               // This is a special quick case, as only one possible offspring is generated
               val theFitness = g - (d - g)
               dProbability += pOfThisGInAllMutations
               dExpectation += pOfThisGInAllMutations * runtimes(parentFitness + theFitness)
-            } else {
+            else
               // Getting the probability of reaching a fitness (probOfReachingF(i) corresponds to fitness x + i)
               val probOfReachingF = crossoverComputation.compute(d, g, populationSize, xProb)
               var xProbOfImprovement, xRemainingTime = 0.0
@@ -101,22 +95,14 @@ class OLLComputation(val n: Int,
               // but for those smaller than the best mutant, which we know, we use the runtime value
               // corresponding to the best mutant
               val minimumFitnessToUse = if (includeBestMutantInComparison) g - (d - g) else -1
-              var i = 0
-              while (i < probOfReachingF.length) {
+              loopFromUntil(0, probOfReachingF.length): i =>
                 val nextFitness = parentFitness + math.max(i, minimumFitnessToUse)
-                if (nextFitness > parentFitness) {
+                if nextFitness > parentFitness then
                   xProbOfImprovement += probOfReachingF(i)
                   xRemainingTime += probOfReachingF(i) * runtimes(nextFitness)
-                }
-                i += 1
-              }
               dProbability += pOfThisGInAllMutations * xProbOfImprovement
               dExpectation += pOfThisGInAllMutations * xRemainingTime
-            }
-          }
-
-          g += 1
-        }
+            end if
 
         assert(math.abs(1 - dCumulativeSum) < 1e-9, "Total probability is not 1")
 
@@ -126,34 +112,23 @@ class OLLComputation(val n: Int,
         sumW += dExpectation * multipleHere
 
         // ignoreCrossoverParentDuplicates: seems that influences only the expected iteration size
-        val expectedIterationSize = if (ignoreCrossoverParentDuplicates) {
+        val expectedIterationSize = if ignoreCrossoverParentDuplicates then
           populationSize + populationSize * (1 - math.pow(xProb.value, d) - math.pow(1 - xProb.value, d))
-        } else 2.0 * populationSize
+        else 2.0 * populationSize
 
         expectedIterationBudget += expectedIterationSize * multipleHere
-      }
-
-      d += 1
-    }
-
+    
     assert(0 <= sumP && sumP <= 1 + 1e-5, s"Something is terribly wrong: sumP = $sumP, x = $parentFitness, lambda = $lambda")
-    if (sumP > 1 + 1e-9) {
-      println(s"Warning: sumP = $sumP")
-    }
-    if (sumP > 1) {
-      sumP = 1
-    }
+    if sumP > 1 + 1e-9 then println(s"Warning: sumP = $sumP")
+    if sumP > 1 then sumP = 1
 
     // The final result is straightforward: we wait until success, then go the chosen way,
     // assuming we spend `expectedIterationBudget` fitness evaluations in each iteration
     ExpectedWaitingTime(updateProbability = sumP, conditionedExpectation = sumW + expectedIterationBudget)
-  }
 
-  def logConfiguration(out: PrintWriter): Unit = {
+  def logConfiguration(out: PrintWriter): Unit =
     out.print(s"""# n=$n
                  |# --never-mutate-zero-bits=$neverMutateZeroBits
                  |# --include-best-mutant=$includeBestMutantInComparison
                  |# --ignore-crossover-parent-duplicates=$ignoreCrossoverParentDuplicates
                  |""".stripMargin)
-  }
-}

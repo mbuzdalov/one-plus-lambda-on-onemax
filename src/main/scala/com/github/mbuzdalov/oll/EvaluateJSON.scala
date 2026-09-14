@@ -1,29 +1,28 @@
 package com.github.mbuzdalov.oll
 
+import com.github.mbuzdalov.util.Loops.{loopFromDownTo, loopFromUntil}
+
 import java.io.{BufferedReader, FileReader, PrintWriter}
-import java.util.{StringTokenizer, ArrayList => JArrayList}
+import java.util.{StringTokenizer, ArrayList as JArrayList}
 import java.util.concurrent.{Callable, ScheduledThreadPoolExecutor}
-
 import scala.util.Using
-
 import com.github.mbuzdalov.util.MathEx
 
-object EvaluateJSON {
+object EvaluateJSON:
   def run(n: Int, lambdas: Int => Double, populationSizes: Int => Int, ollComputation: OLLComputation): Double = {
-    val runtimes = new Array[Double](n + 1)
-    for (f <- n - 1 to 0 by -1) {
+    val runtimes = Array.ofDim[Double](n + 1)
+    loopFromDownTo(n - 1, 0): f =>
       val lambda = lambdas(f)
       val populationSize = populationSizes(f)
       runtimes(f) = ollComputation.findRuntime(f, lambda, populationSize, runtimes).toDouble
-    }
     MathEx.expectedRuntimeOnBitStrings(n, runtimes)
   }
 
-  def main(args: Array[String]): Unit = {
-    val cmd = new CommandLineArgs(args)
-    val input = Using.resource(new BufferedReader(new FileReader(cmd.getString("input", "(expected input filename)"))))(_.readLine())
+  def main(args: Array[String]): Unit =
+    val cmd = CommandLineArgs(args)
+    val input = Using.resource(BufferedReader(FileReader(cmd.getString("input", "(expected input filename)"))))(_.readLine())
 
-    Using.resource(new PrintWriter(cmd.getString("output", "(expected output filename)"))) { out =>
+    Using.resource(PrintWriter(cmd.getString("output", "(expected output filename)"))): out =>
       val st = new StringTokenizer(input, ":[]{}, ")
 
       val nToken = "\"n\""
@@ -34,7 +33,7 @@ object EvaluateJSON {
       val computedRuntimeMeanToken = "\"computed_runtime_mean\""
 
       val tasks = new JArrayList[Callable[String]]
-      while (st.hasMoreTokens) {
+      while st.hasMoreTokens do
         assert(st.nextToken() == nToken)
         val n = st.nextToken().toInt
         assert(st.nextToken() == experimentToken)
@@ -46,13 +45,13 @@ object EvaluateJSON {
         assert(st.nextToken() == lambdasToken)
         val lambdas = Array.fill(n)(st.nextToken().toDouble)
 
-        tasks.add(() => {
-          val crossoverComputation = new InMemoryCostPrioritizingCrossoverCache(
+        tasks.add: () =>
+          val crossoverComputation = InMemoryCostPrioritizingCrossoverCache(
             maxCacheByteSize = cmd.getLong("max-cache-byte-size"),
             delegate = CrossoverComputation.findMathCapableImplementation(cmd, "crossover-math"),
             verbose = false)
 
-          val ollComputation = new OLLComputation(n,
+          val ollComputation = OLLComputation(n,
             neverMutateZeroBits = cmd.getBoolean("never-mutate-zero-bits"),
             includeBestMutantInComparison = cmd.getBoolean("include-best-mutant"),
             ignoreCrossoverParentDuplicates = cmd.getBoolean("ignore-crossover-parent-duplicates"),
@@ -63,20 +62,16 @@ object EvaluateJSON {
           println(s"$empiricalMean +- $empiricalStd => $result")
 
           s"{$nToken: $n, $experimentToken: $experimentName, $empiricalRuntimeMeanToken: $empiricalMean, $empiricalRuntimeStdToken: $empiricalStd, $computedRuntimeMeanToken: $result, $lambdasToken: ${lambdas.mkString("[", ", ", "]")}}"
-        })
-      }
+      end while
 
-      val pool = new ScheduledThreadPoolExecutor(Runtime.getRuntime.availableProcessors())
+      val pool = ScheduledThreadPoolExecutor(Runtime.getRuntime.availableProcessors())
       val results = pool.invokeAll(tasks)
 
       out.print("[")
-      for (i <- 0 until tasks.size) {
+      loopFromUntil(0, tasks.size): i =>
         if (i != 0) out.print(", ")
         out.print(results.get(i).get())
-      }
       out.println("]")
 
       pool.shutdown()
-    }
-  }
-}
+  end main

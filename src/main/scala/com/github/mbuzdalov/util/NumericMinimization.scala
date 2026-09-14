@@ -1,35 +1,30 @@
 package com.github.mbuzdalov.util
 
+import com.github.mbuzdalov.util.Loops.{forAllFromUntil, loopFromUntil}
+
 import scala.annotation.tailrec
 
-object NumericMinimization {
+object NumericMinimization:
   @tailrec
-  def ternarySearch(fun: Double => Double, left: Double, right: Double, iterations: Int, slideRight: Boolean): Double = {
-    if (iterations == 0 || left == right) {
+  def ternarySearch(fun: Double => Double, left: Double, right: Double, iterations: Int, slideRight: Boolean): Double =
+    if iterations == 0 || left == right then
       (left + right) / 2
-    } else {
+    else
       val ll = (left * 2 + right) / 3
       val rr = (left + 2 * right) / 3
       val lv = fun(ll)
       val rv = fun(rr)
-      if (lv.isFinite && rv.isFinite) {
-        if (lv < rv) {
-          ternarySearch(fun, left, rr, iterations - 1, slideRight)
-        } else {
-          ternarySearch(fun, ll, right, iterations - 1, slideRight)
-        }
-      } else {
-        if (slideRight) {
-          ternarySearch(fun, ll, right, iterations - 1, slideRight)
-        } else {
-          ternarySearch(fun, left, rr, iterations - 1, slideRight)
-        }
-      }
-    }
-  }
+      if lv.isFinite && rv.isFinite then
+        if lv < rv 
+        then ternarySearch(fun, left, rr, iterations - 1, slideRight)
+        else ternarySearch(fun, ll, right, iterations - 1, slideRight)
+      else
+        if slideRight
+        then ternarySearch(fun, ll, right, iterations - 1, slideRight)
+        else ternarySearch(fun, left, rr, iterations - 1, slideRight)
 
-  class CMAIndividual(dimension: Int) extends Comparable[CMAIndividual] {
-    private val x, z, fixedX = new Array[Double](dimension)
+  class CMAIndividual(dimension: Int) extends Comparable[CMAIndividual]:
+    private val x, z, fixedX = Array.ofDim[Double](dimension)
     private var rawFitness, fitness, penalty = 0.0
 
     @tailrec
@@ -39,18 +34,15 @@ object NumericMinimization {
                          xMean: Array[Double],
                          D: Array[Double],
                          sigma: Double,
-                         remaining: Int): Unit = {
+                         remaining: Int): Unit =
       penalty = 0
-      var i = 0
-      while (i < z.length) {
+      loopFromUntil(0, z.length): i =>
         z(i) = rng.nextGaussian()
         x(i) = xMean(i) + D(i) * z(i) * sigma
         fixedX(i) = math.min(upperBound(i), math.max(lowerBound(i), x(i)))
         penalty += math.abs(x(i) - fixedX(i))
-        i += 1
-      }
-      if (penalty != 0 && remaining > 0) initialize(rng, lowerBound, upperBound, xMean, D, sigma, remaining - 1)
-    }
+      if penalty != 0 && remaining > 0 then
+        initialize(rng, lowerBound, upperBound, xMean, D, sigma, remaining - 1)
 
     def getDimension: Int = z.length
     def getFixedX: Array[Double] = fixedX
@@ -63,7 +55,7 @@ object NumericMinimization {
     def getZ(index: Int): Double = z(index)
 
     override def compareTo(o: CMAIndividual): Int = java.lang.Double.compare(fitness, o.fitness)
-  }
+  end CMAIndividual
 
   def optimizeDistributionBySeparableCMAES(initialMean: Array[Double],
                                            lowerBound: Int => Double,
@@ -73,7 +65,7 @@ object NumericMinimization {
                                            maxIterations: Int,
                                            populationSize: Int,
                                            nResamplingUntilFeasible: Int,
-                                           logToConsole: Boolean): (Array[Double], Double) = {
+                                           logToConsole: Boolean): (Array[Double], Double) =
     val dimension = initialMean.length
 
     // Initialize the common step size.
@@ -107,11 +99,11 @@ object NumericMinimization {
     // Initialize matrices and step sizes.
     val D = Array.fill(dimension)(1.0)
     val C = D.map(v => v * v)
-    val pc, ps = new Array[Double](dimension)
+    val pc, ps = Array.ofDim[Double](dimension)
 
     // Initialize fitness history to track stagnation.
     val historySize = 10 + (30.0 * dimension / populationSize).toInt
-    val fitnessHistory = new FitnessHistory(historySize)
+    val fitnessHistory = FitnessHistory(historySize)
 
     // Fetch the thread-local random number generator.
     val random = FastRandom.threadLocal
@@ -119,29 +111,26 @@ object NumericMinimization {
     // Create and evaluate the initial guess.
     val xMean = initialMean.clone()
     var bestRunIndividual = xMean.clone
-    var bestRunFitness = {
-      val wrapper = new CMAIndividual(dimension)
+    var bestRunFitness =
+      val wrapper = CMAIndividual(dimension)
       wrapper.initialize(random, lowerBound, upperBound, xMean, D, 0.0, 0)
       function(Array(wrapper))
       wrapper.setPenaltyWeight(1)
       wrapper.getFitness
-    }
 
     fitnessHistory.push(bestRunFitness)
 
-    if (logToConsole) {
-      println(s"Initial mean: $bestRunFitness by ${bestRunIndividual.mkString("[", ", ", "]")}")
-    }
+    if logToConsole then println(s"Initial mean: $bestRunFitness by ${bestRunIndividual.mkString("[", ", ", "]")}")
 
     // Allocate all the memory for individuals and auxiliary fitness in/out arrays.
-    val individuals = Array.fill(populationSize)(new CMAIndividual(dimension))
+    val individuals = Array.fill(populationSize)(CMAIndividual(dimension))
 
     // Do the iterations.
     var iterations = 0
     var continueOptimization = true
-    while (continueOptimization && iterations < maxIterations) {
+    while continueOptimization && iterations < maxIterations do
       iterations += 1
-      if (logToConsole) print(s"Iteration $iterations: ")
+      if logToConsole then print(s"Iteration $iterations: ")
 
       // Initialize the current population.
       individuals.foreach(_.initialize(random, lowerBound, upperBound, xMean, D, sigma, nResamplingUntilFeasible))
@@ -157,15 +146,11 @@ object NumericMinimization {
       scala.util.Sorting.quickSort(individuals)
 
       // Update the before-the-matrix step size (commonly known as ps).
-      for (i <- 0 until dimension) {
+      loopFromUntil(0, dimension): i =>
         var zMeanI = 0.0
-        var j = 0
-        while (j < mu) {
+        loopFromUntil(0, mu): j =>
           zMeanI += weights(j) * individuals(j).getZ(i)
-          j += 1
-        }
         ps(i) = ps(i) * (1 - cs) + zMeanI * qCS
-      }
 
       // Compute normalization coefficients for the rest of the updates.
       val normPS = math.sqrt(sumSquares(ps))
@@ -174,23 +159,19 @@ object NumericMinimization {
       val oldFac = (1 - cCov1Sep - cCovMuSep) + (if (hSig) 0 else cCov1Sep * cc * (2 - cc))
 
       // Do all the updates in a single run to avoid storage of temporary variables.
-      for (i <- 0 until dimension) {
+      loopFromUntil(0, dimension): i =>
         val xOldI = xMean(i)
         xMean(i) = 0
         var weighedSquare = 0.0
-        var j = 0
-        while (j < mu) {
+        loopFromUntil(0, mu): j =>
           val xi = individuals(j).getX(i)
           val zi = individuals(j).getZ(i)
           val wj = weights(j)
           xMean(i) += wj * xi
           weighedSquare += wj * zi * zi
-          j += 1
-        }
         pc(i) = pc(i) * (1 - cc) + q2 * (xMean(i) - xOldI)
         C(i) = C(i) * oldFac + pc(i) * pc(i) * cCov1Sep + C(i) * weighedSquare * cCovMuSep
         D(i) = math.sqrt(C(i))
-      }
 
       // Adapt the common step size.
       sigma *= math.exp(math.min(1, (normPS / chiN - 1) * cs / damps))
@@ -198,15 +179,11 @@ object NumericMinimization {
       // Update the best individual, and also check up the worst fitness across the iteration.
       val bestFitness = individuals(0).getFitness
       val worstFitness = individuals(populationSize - 1).getFitness
-      if (bestRunFitness > bestFitness) {
+      if bestRunFitness > bestFitness then
         bestRunFitness = bestFitness
         bestRunIndividual = individuals(0).getFixedX.clone
-        if (logToConsole) {
-          println(s"update to $bestRunFitness by ${bestRunIndividual.mkString("[", ", ", "]")}")
-        }
-      } else {
-        println(s"best fitness $bestFitness")
-      }
+        if logToConsole then println(s"update to $bestRunFitness by ${bestRunIndividual.mkString("[", ", ", "]")}")
+      else println(s"best fitness $bestFitness")
 
       // Collect the data needed for termination condition checks.
       val maxD = max(D)
@@ -215,102 +192,66 @@ object NumericMinimization {
       val historyWorst = fitnessHistory.maximum
 
       // Check termination conditions.
-      if (maxD / minD > 1e7
+      if maxD / minD > 1e7
         || sigma * maxD > stopTolUpX
         || iterations > 2 && math.max(historyWorst, worstFitness) - math.min(historyBest, bestFitness) < stopTolFun
         || iterations > fitnessHistory.capacity && historyWorst - historyBest < stopTolHistFun
-        || (0 until dimension).forall(i => !(sigma * math.max(math.abs(pc(i)), D(i)) > stopTolX))) {
-        continueOptimization = false
-      } else {
+        || forAllFromUntil(0, dimension)(i => !(sigma * math.max(math.abs(pc(i)), D(i)) > stopTolX)) 
+      then continueOptimization = false
+      else
         // Adjust step size in the case of equal function values, the case of plain population.
-        if (bestRunFitness == individuals((0.1 + populationSize / 4.0).toInt).getFitness) {
+        if bestRunFitness == individuals((0.1 + populationSize / 4.0).toInt).getFitness then
           sigma *= math.exp(0.2 + cs / damps)
-        }
         // Adjust step size in the case of equal fitness values, the case of plain history.
-        if (iterations > 2 && math.max(historyWorst, bestFitness) - math.min(historyBest, bestFitness) == 0) {
+        if iterations > 2 && math.max(historyWorst, bestFitness) - math.min(historyBest, bestFitness) == 0 then
           sigma *= math.exp(0.2 + cs / damps)
-        }
         // Update the fitness history.
         fitnessHistory.push(bestFitness)
-      }
-    }
-
+      end if
+    end while
+    
     (bestRunIndividual, bestRunFitness)
-  }
 
   // Warning: this is not the same as array.max due to the possible presence of NaNs
-  private def max(array: Array[Double]): Double = {
+  private def max(array: Array[Double]): Double =
     var result = Double.NegativeInfinity
-    var i = 0
-    while (i < array.length) {
+    loopFromUntil(0, array.length): i =>
       val a = array(i)
-      if (result < a) {
-        result = a
-      }
-      i += 1
-    }
+      if result < a then result = a
     result
-  }
 
   // Warning: this is not the same as array.max due to the possible presence of NaNs
-  private def maxRawFitness(array: Array[CMAIndividual]): Double = {
+  private def maxRawFitness(array: Array[CMAIndividual]): Double =
     var result = Double.NegativeInfinity
-    var i = 0
-    while (i < array.length) {
+    loopFromUntil(0, array.length): i =>
       val a = array(i).getRawFitness
-      if (result < a) {
-        result = a
-      }
-      i += 1
-    }
+      if result < a then result = a
     result
-  }
 
   // Warning: this is not the same as array.min due to the possible presence of NaNs
-  private def min(array: Array[Double]): Double = {
+  private def min(array: Array[Double]): Double =
     var result = Double.PositiveInfinity
-    var i = 0
-    while (i < array.length) {
+    loopFromUntil(0, array.length): i =>
       val a = array(i)
-      if (result > a) {
-        result = a
-      }
-      i += 1
-    }
+      if result > a then result = a
     result
-  }
 
   // Warning: this is not the same as array.max due to the possible presence of NaNs
-  private def minRawFitness(array: Array[CMAIndividual]): Double = {
+  private def minRawFitness(array: Array[CMAIndividual]): Double =
     var result = Double.PositiveInfinity
-    var i = 0
-    while (i < array.length) {
+    loopFromUntil(0, array.length): i =>
       val a = array(i).getRawFitness
-      if (result > a) {
-        result = a
-      }
-      i += 1
-    }
+      if result > a then result = a
     result
-  }
 
-  private def sum(array: Array[Double]): Double = {
+  private def sum(array: Array[Double]): Double =
     var result = 0.0
-    var i = 0
-    while (i < array.length) {
+    loopFromUntil(0, array.length): i =>
       result += array(i)
-      i += 1
-    }
     result
-  }
 
-  private def sumSquares(array: Array[Double]): Double = {
+  private def sumSquares(array: Array[Double]): Double =
     var result = 0.0
-    var i = 0
-    while (i < array.length) {
+    loopFromUntil(0, array.length): i =>
       result += array(i) * array(i)
-      i += 1
-    }
     result
-  }
-}

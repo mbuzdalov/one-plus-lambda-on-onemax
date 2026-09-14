@@ -1,6 +1,6 @@
 package com.github.mbuzdalov.util
 
-object Viridis {
+object Viridis:
   private val viridisColorMap = Array(
     (0.267004, 0.004874, 0.329415), (0.268510, 0.009605, 0.335427), (0.269944, 0.014625, 0.341379),
     (0.271305, 0.019942, 0.347269), (0.272594, 0.025563, 0.353093), (0.273809, 0.031497, 0.358853),
@@ -89,15 +89,11 @@ object Viridis {
     (0.964894, 0.902323, 0.123941), (0.974417, 0.903590, 0.130215), (0.983868, 0.904867, 0.136897),
     (0.993248, 0.906157, 0.143936))
 
-  private def interpolate(below: Int, index: Double, above: Int, getter: ((Double, Double, Double)) => Double): Double = {
-    if (below == above)
-      getter(viridisColorMap(below))
-    else {
-      getter(viridisColorMap(below)) * (above - index) + getter(viridisColorMap(above)) * (index - below)
-    }
-  }
-
-  def apply(value: Double): Int = {
+  private def interpolate(below: Int, index: Double, above: Int, getter: ((Double, Double, Double)) => Double): Double =
+    if below == above then getter(viridisColorMap(below))
+    else getter(viridisColorMap(below)) * (above - index) + getter(viridisColorMap(above)) * (index - below)
+  
+  def apply(value: Double): Int =
     require(value >= 0 && value <= 1)
     val floatIndex = value * (viridisColorMap.length - 1)
     val below = math.floor(floatIndex).toInt
@@ -106,5 +102,3 @@ object Viridis {
     val g = math.round(255 * interpolate(below, floatIndex, above, _._2)).toInt & 0xff
     val b = math.round(255 * interpolate(below, floatIndex, above, _._3)).toInt & 0xff
     b ^ (g << 8) ^ (r << 16)
-  }
-}

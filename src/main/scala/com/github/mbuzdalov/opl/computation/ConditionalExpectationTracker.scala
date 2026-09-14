@@ -1,22 +1,20 @@
 package com.github.mbuzdalov.opl.computation
 
-private class ConditionalExpectationTracker(expectations: Array[Double]) {
-  private[this] var updateProbability, conditionalExpectation: Double = _
+import scala.compiletime.uninitialized
 
-  final def reset(): Unit = {
+private class ConditionalExpectationTracker(expectations: Array[Double]):
+  private var updateProbability, conditionalExpectation: Double = uninitialized
+
+  final def reset(): Unit =
     updateProbability = 0
     conditionalExpectation = 0
-  }
 
-  def receiveProbability(newDistance: Int, probability: Double): Unit = {
+  def receiveProbability(newDistance: Int, probability: Double): Unit =
     updateProbability += probability
-    if (newDistance >= 1) {
+    if newDistance >= 1 then
       val exp = expectations(newDistance - 1)
       assert(exp.isFinite)
       conditionalExpectation += probability * exp
-    }
-  }
 
   def getConditionalExpectation: Double = conditionalExpectation
   def getUpdateProbability: Double = updateProbability
-}

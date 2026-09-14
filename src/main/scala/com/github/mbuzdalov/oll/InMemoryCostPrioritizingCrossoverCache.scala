@@ -1,6 +1,7 @@
 package com.github.mbuzdalov.oll
 
 import scala.annotation.tailrec
+import scala.compiletime.uninitialized
 
 /**
  * This cache tries to save roughly a given byte volume of cached entries in memory.
@@ -12,65 +13,62 @@ import scala.annotation.tailrec
  */
 class InMemoryCostPrioritizingCrossoverCache(maxCacheByteSize: Long,
                                              delegate: CrossoverComputation,
-                                             verbose: Boolean) extends CrossoverComputation {
+                                             verbose: Boolean) extends CrossoverComputation:
   import InMemoryCostPrioritizingCrossoverCache.CacheEntry
 
   private val entryOrdering: Ordering[CacheEntry] = (x: CacheEntry, y: CacheEntry) => -java.lang.Long.compare(x.g, y.g)
   private val cache = new scala.collection.mutable.HashMap[CacheEntry, CacheEntry]
-  private val queue = new scala.collection.mutable.PriorityQueue[CacheEntry]()(entryOrdering)
+  private val queue = new scala.collection.mutable.PriorityQueue[CacheEntry]()(using entryOrdering)
   private var byteSize, queries, hits, hitTime, totalHits, misses, missTime, totalMisses = 0L
 
   @tailrec
-  private def tryAddEntry(e: CacheEntry): Unit = {
+  private def tryAddEntry(e: CacheEntry): Unit =
     val newCacheByteSize = byteSize + e.byteSize
-    if (newCacheByteSize <= maxCacheByteSize) {
+    if newCacheByteSize <= maxCacheByteSize then
       cache.put(e, e)
       queue.addOne(e)
       byteSize = newCacheByteSize
-    } else {
+    else
       val queueTop = queue.head
-      if (e.g > queueTop.g) {
+      if e.g > queueTop.g then
         queue.dequeue()
         cache.remove(queueTop)
         byteSize -= queueTop.byteSize
         tryAddEntry(e)
-      }
-    }
-  }
 
-  override def compute(distanceToParent: Int, goodBitsInDifference: Int, populationSize: Int, crossoverBias: AugmentedProbability): Array[Double] = {
+  override def compute(distanceToParent: Int, goodBitsInDifference: Int, populationSize: Int, crossoverBias: AugmentedProbability): Array[Double] =
     val entry = CacheEntry(distanceToParent, goodBitsInDifference, populationSize, crossoverBias)
-    cache.synchronized {
+    val entryVal = cache.synchronized:
       assert(cache.size == queue.size)
 
       val timeCost = goodBitsInDifference.toLong * goodBitsInDifference
-      val realEntry = if (cache.contains(entry)) {
+      val realEntry = if cache.contains(entry) then
         hits += 1
         hitTime += timeCost
         cache(entry)
-      } else {
+      else
         misses += 1
         missTime += timeCost
         tryAddEntry(entry)
         entry
-      }
+      end realEntry
+      
       queries += 1
-      if (queries % 1000000 == 0) {
+      if queries % 1000000 == 0 then
         totalHits += hits
         totalMisses += misses
-        if (verbose) {
+        if verbose then 
           println(s"[$queries queries, $totalHits hits ($hits new, cost $hitTime), $totalMisses misses ($misses new, cost $missTime), cache size ${cache.size}, $byteSize bytes in arrays]")
-        }
         hits = 0
         misses = 0
         hitTime = 0
         missTime = 0
-      }
+      end if
       realEntry
-    }.result(delegate)
-  }
+    end entryVal
+    entryVal.result(delegate)
 
-  override def clear(): Unit = {
+  override def clear(): Unit =
     cache.clear()
     queue.clear()
     byteSize = 0
@@ -81,20 +79,12 @@ class InMemoryCostPrioritizingCrossoverCache(maxCacheByteSize: Long,
     misses = 0
     missTime = 0
     totalMisses = 0
-  }
-}
+end InMemoryCostPrioritizingCrossoverCache
 
-object InMemoryCostPrioritizingCrossoverCache {
-  private case class CacheEntry(d: Int, g: Int, popSize: Int, xProb: AugmentedProbability) {
-    private[this] var cachedResult: Array[Double] = _
-
+object InMemoryCostPrioritizingCrossoverCache:
+  private case class CacheEntry(d: Int, g: Int, popSize: Int, xProb: AugmentedProbability):
+    private var cachedResult: Array[Double] = uninitialized
     def byteSize: Int = (g + 5) * 8
-
-    def result(delegate: CrossoverComputation): Array[Double] = synchronized {
-      if (cachedResult == null) {
-        cachedResult = delegate.compute(d, g, popSize, xProb)
-      }
+    def result(delegate: CrossoverComputation): Array[Double] = synchronized:
+      if cachedResult == null then cachedResult = delegate.compute(d, g, popSize, xProb)
       cachedResult
-    }
-  }
-}

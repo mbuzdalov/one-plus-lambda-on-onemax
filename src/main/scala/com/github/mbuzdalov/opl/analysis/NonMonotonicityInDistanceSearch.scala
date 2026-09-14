@@ -7,30 +7,23 @@ import com.github.mbuzdalov.opl.computation.callback.Callback
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Using
 
-class NonMonotonicityInDistanceSearch(path: Path) extends Callback[Int] with AutoCloseable {
+class NonMonotonicityInDistanceSearch(path: Path) extends Callback[Int] with AutoCloseable:
   private var prevBestParameter: Int = 0
   private var prevBestValue: Double = Double.NegativeInfinity
-  private val strangeness = new ArrayBuffer[Problem]()
+  private val strangeness = ArrayBuffer[Problem]()
 
-  override def callBack(distance: Int, parameters: Array[Int], values: Array[Double], bestParameter: Int, bestValue: Double): Unit = {
-    if (prevBestParameter > bestParameter) {
+  override def callBack(distance: Int, parameters: Array[Int], values: Array[Double], bestParameter: Int, bestValue: Double): Unit =
+    if prevBestParameter > bestParameter then
       val prevBestIndex = parameters.indexOf(prevBestParameter)
       strangeness += Problem(distance, prevBestParameter, bestParameter, bestValue, values(prevBestIndex))
-    }
     prevBestParameter = bestParameter
     prevBestValue = bestValue
-  }
 
-  override def close(): Unit = {
-    if (strangeness.nonEmpty) {
-      Using.resource(Files.newBufferedWriter(path)) { writer =>
+  override def close(): Unit =
+    if strangeness.nonEmpty then
+      Using.resource(Files.newBufferedWriter(path)): writer =>
         writer.write("distance,prev best,curr best,value at curr best,value at prev best\n")
-        for (s <- strangeness) {
+        for s <- strangeness do
           writer.write(s"${s.distance},${s.prevBest},${s.currBest},${s.currAtBest},${s.currAtPrevBest}\n")
-        }
-      }
-    }
-  }
 
-  case class Problem(distance: Int, prevBest: Int, currBest: Int, currAtBest: Double, currAtPrevBest: Double)
-}
+  private case class Problem(distance: Int, prevBest: Int, currBest: Int, currAtBest: Double, currAtPrevBest: Double)

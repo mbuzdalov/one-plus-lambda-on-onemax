@@ -1,19 +1,21 @@
 package com.github.mbuzdalov.util
 
-import java.util.Random
+import com.github.mbuzdalov.util.Loops.loopFromUntil
 
+import java.util.Random
 import scala.annotation.tailrec
+import scala.compiletime.uninitialized
 
 /**
  * A Scala implementation of CMWC4096 algorithm.
  *
  * This implementation is essentially single-threaded, i.e. no methods are synchronized.
- * For the multi-threaded use of this class, the method `threadLocal` is provided.
+ * For the multithreaded use of this class, the method `threadLocal` is provided.
  *
  * @author Maxim Buzdalov
  */
-object FastRandom {
-  private val THREAD_LOCAL = ThreadLocal.withInitial(() => new FastRandom())
+object FastRandom:
+  private val THREAD_LOCAL = ThreadLocal.withInitial(() => FastRandom())
 
   //for initialization similar to java.util.Random
   // with corrections from http://www.alife.co.uk/nonrandom/proposal/index.html
@@ -36,70 +38,60 @@ object FastRandom {
     * @return the thread-local random number generator.
     */
   def threadLocal: FastRandom = THREAD_LOCAL.get
-}
+end FastRandom
 
-class FastRandom extends Random {
+class FastRandom extends Random:
   import FastRandom._
 
-  private var Q: Array[Int] = _
+  private var Q: Array[Int] = uninitialized
   private var c = 0
   private var idx = 0
 
-  override final def setSeed(seed: Long): Unit = {
+  override final def setSeed(seed: Long): Unit =
     super.setSeed(seed)
     var mySeed = seed
-    if (Q == null)
-      Q = new Array[Int](Q_SIZE)
+    if Q == null then Q = Array.ofDim(Q_SIZE)
     mySeed = nextSeed(mySeed)
     c = (mySeed >>> 16).toInt % 809430660
     mySeed = nextSeed(mySeed)
-    var i = 0
-    while (i < Q_SIZE) {
+    loopFromUntil(0, Q_SIZE): i =>
       Q(i) = (mySeed >>> 16).toInt
       mySeed = nextSeed(mySeed)
-      i += 1
-    }
     this.idx = 0
-  }
 
   private def nextSeed(seed: Long): Long = (seed & mask) * multiplier + addend + (seed >>> 47)
 
   //noinspection SameParameterValue - for some reason IDEA does not account for super's calls here
-  override final protected def next(nBits: Int): Int = {
+  override final protected def next(nBits: Int): Int =
     idx = (idx + 1) & (Q_SIZE - 1)
     val t = a * Q(idx) + c
     c = (t >>> 32).toInt
     var x = t.toInt + c
-    if (x < c) {
+    if x < c then
       x += 1
       c += 1
-    }
     val result = r - x
     Q(idx) = result
     result >>> (32 - nBits)
-  }
 
   @tailrec
-  override final def nextGaussian(): Double = {
+  override final def nextGaussian(): Double =
     val u = next(32)
     val i = u & 0x0000007F
     val sign = u & 0x00000080
     val j = u >>> 8
     var x = j * ZIGGURAT_W(i)
-    if (j < ZIGGURAT_K(i)) {
+    if j < ZIGGURAT_K(i) then
       if (sign == 0) x else -x
-    } else {
-      val y = if (i < 127) {
+    else
+      val y = if i < 127 then
         val y0 = ZIGGURAT_Y(i)
         val y1 = ZIGGURAT_Y(i + 1)
         y1 + (y0 - y1) * nextDouble()
-      } else {
+      else
         x = ZIGGURAT_R - math.log(1 - nextDouble()) / ZIGGURAT_R
         math.exp(-ZIGGURAT_R * (x - 0.5 * ZIGGURAT_R)) * nextDouble()
-      }
-      if (y < math.exp(-0.5 * x * x)) {
+      if y < math.exp(-0.5 * x * x) then
         if (sign == 0) x else -x
-      } else nextGaussian()
-    }
-  }
-}
+      else nextGaussian()
+end FastRandom

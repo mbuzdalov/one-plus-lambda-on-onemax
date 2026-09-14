@@ -1,13 +1,15 @@
 package com.github.mbuzdalov.oll.xover
 
 import com.github.mbuzdalov.oll.{AugmentedProbability, CrossoverComputation}
+import com.github.mbuzdalov.util.Loops.{loopFromDownTo, loopFromUntil}
 import com.github.mbuzdalov.util.MathEx
 
-object ZeroCheckingSeparateCrossoverComputation extends CrossoverComputation {
+object ZeroCheckingSeparateCrossoverComputation extends CrossoverComputation:
   private val singularArray = Array.fill(1)(1.0)
   private val eps = 1e-20
 
-  override def compute(distanceToParent: Int, goodBitsInDifference: Int, populationSize: Int, crossoverBias: AugmentedProbability): Array[Double] = {
+  override def compute(distanceToParent: Int, goodBitsInDifference: Int, populationSize: Int, 
+                       crossoverBias: AugmentedProbability): Array[Double] =
     var probOfReachingF: Array[Double] = null
 
     // For the Hamming distance between the parent and the offspring being `distanceToParent` = d,
@@ -18,105 +20,78 @@ object ZeroCheckingSeparateCrossoverComputation extends CrossoverComputation {
     // Denote y=f-x, the event has the probability choose(g, y+i) * choose(d-g, i) * xProb^(y+2*i) * (1-xProb)^(d-(y+2*i)).
 
     var sumP = 0.0
-    var fitnessDiff = goodBitsInDifference
-    while (fitnessDiff >= 1) {
+    loopFromDownTo(goodBitsInDifference, 1): fitnessDiff =>
       val maxI = math.min(distanceToParent - goodBitsInDifference, goodBitsInDifference - fitnessDiff)
       var localSum = 0.0
-      if (maxI == 0) {
+      if maxI == 0 then
         localSum += theExpr(distanceToParent, goodBitsInDifference, fitnessDiff, 0, crossoverBias)
-      } else {
+      else
         // Now we are trying to guess the index such that the value at it is the maximum
         val qq = crossoverBias.pOverOneMinusP * crossoverBias.pOverOneMinusP
         val q2 = qq - 1
         val q1 = qq * (fitnessDiff - distanceToParent) - (fitnessDiff + 2)
         val q0 = qq * (fitnessDiff - goodBitsInDifference) * (goodBitsInDifference - distanceToParent) - (fitnessDiff + 1)
-        val testBestI = if (math.abs(q2) < 1e-9) {
-          // The linear case
-          (-q0 / q1).toInt
-        } else {
-          // The quadratic case
-          ((-q1 - math.sqrt(q1 * q1 - 4 * q0 * q2)) / (2 * q2)).toInt
-        }
+        val testBestI = 
+          if math.abs(q2) < 1e-9 
+          then (-q0 / q1).toInt // The linear case
+          else ((-q1 - math.sqrt(q1 * q1 - 4 * q0 * q2)) / (2 * q2)).toInt // The quadratic case
         val bestI = math.min(maxI, math.max(0, testBestI))
 
         localSum = theExpr(distanceToParent, goodBitsInDifference, fitnessDiff, bestI, crossoverBias)
-        if (localSum * (maxI + 1) < eps) {
-          // Do nothing, as the result will not exceed `eps` by monotonicity, and hence will be useless
-        } else {
+        if localSum * (maxI + 1) >= eps then // otherwise do nothing, as the result will not exceed `eps` by monotonicity, and hence will be useless
           var flippedBadBits = bestI - 1
-          while (flippedBadBits >= 0) {
+          while flippedBadBits >= 0 do
             val oldLocalSum = localSum
             localSum += theExpr(distanceToParent, goodBitsInDifference, fitnessDiff, flippedBadBits, crossoverBias)
-            if (oldLocalSum == localSum) {
-              flippedBadBits = 0
-            }
+            if oldLocalSum == localSum then /* break */ flippedBadBits = 0
             flippedBadBits -= 1
-          }
           flippedBadBits = bestI + 1
-          while (flippedBadBits <= maxI) {
+          while flippedBadBits <= maxI do
             val oldLocalSum = localSum
             localSum += theExpr(distanceToParent, goodBitsInDifference, fitnessDiff, flippedBadBits, crossoverBias)
-            if (oldLocalSum == localSum) {
-              flippedBadBits = maxI
-            }
+            if oldLocalSum == localSum then /* break */ flippedBadBits = maxI
             flippedBadBits += 1
-          }
-        }
-      }
+        end if
+      end if
 
-      if (localSum > eps) {
-        if (probOfReachingF == null) {
-          probOfReachingF = new Array[Double](fitnessDiff + 1)
-        }
+      if localSum > eps then 
+        if probOfReachingF == null then 
+          probOfReachingF = Array.ofDim(fitnessDiff + 1)
         probOfReachingF(fitnessDiff) = localSum
-      }
 
       sumP += localSum
-      fitnessDiff -= 1
-    }
 
-    if (sumP > 1) {
-      assert(sumP <= 1 + 1e-9, s"sumP is too much: $sumP")
+    if sumP > 1 then
+      assert(sumP <= 1 + 1e-9, s"sumP is too big: $sumP")
       sumP = 1
-    }
 
-    if (probOfReachingF == null) {
-      singularArray
-    } else {
+    if probOfReachingF == null then singularArray else
       probOfReachingF(0) = 1 - sumP
 
       // Now we use populationSize to obtain the final result.
       // The basic idea is that we reach fitness f if all crossover offspring have fitness <= f,
       // but not of them have fitness <= f-1, which results in the infamous subtraction of powers.
-      if (populationSize > 1) {
+      if populationSize > 1 then
         var sum = 0.0
         var probOfReachingFSum = 0.0
-        var i = 0
-        while (i < probOfReachingF.length) {
+        loopFromUntil(0, probOfReachingF.length): i =>
           val newSum = sum + probOfReachingF(i)
           probOfReachingF(i) = math.pow(newSum, populationSize) - math.pow(sum, populationSize)
           probOfReachingFSum += probOfReachingF(i)
           sum = newSum
-          i += 1
-        }
 
         assert(math.abs(1 - sum) < 1e-9, "Total probability is not 1")
         assert(math.abs(1 - probOfReachingFSum) < 1e-9, "Population sizing fails")
-      }
 
       probOfReachingF
-    }
-  }
 
   private def theExpr(distanceToParent: Int, goodBitsInDifference: Int,
-                      fitnessDiff: Int, flippedBadBits: Int, crossoverBias: AugmentedProbability): Double = {
+                      fitnessDiff: Int, flippedBadBits: Int, crossoverBias: AugmentedProbability): Double =
     val flippedGoodBits = fitnessDiff + flippedBadBits
     val flippedBits = flippedBadBits + flippedGoodBits
     math.exp(MathEx.logChoose(goodBitsInDifference, flippedGoodBits)
       + MathEx.logChoose(distanceToParent - goodBitsInDifference, flippedBadBits)
       + crossoverBias.logarithm * flippedBits
       + crossoverBias.logarithmOfOneMinus * (distanceToParent - flippedBits))
-  }
 
-  override def clear(): Unit = {}
-}
+  override def clear(): Unit = ()

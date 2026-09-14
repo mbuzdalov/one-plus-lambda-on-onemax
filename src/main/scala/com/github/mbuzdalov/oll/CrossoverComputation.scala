@@ -1,6 +1,6 @@
 package com.github.mbuzdalov.oll
 
-import com.github.mbuzdalov.oll.xover.{BasicSeparateCrossoverComputation, LegacyCollectiveCrossoverComputation, ZeroCheckingSeparateCrossoverComputation}
+import com.github.mbuzdalov.oll.xover.*
 
 /**
  * This is an interface to computation and storage of crossover transition probability facilities.
@@ -8,7 +8,7 @@ import com.github.mbuzdalov.oll.xover.{BasicSeparateCrossoverComputation, Legacy
  * that just do the math but does not cache anything.
  * Other implementations of this trait may delegate computation and perform some sort of caching.
  */
-trait CrossoverComputation {
+trait CrossoverComputation:
   /**
    * Computes the transition probabilities to fitness values equal or higher than the parent's
    * after the crossover is invoked for `populationSize` times
@@ -32,15 +32,11 @@ trait CrossoverComputation {
    * Cleans up all the resources used by the object.
    */
   def clear(): Unit
-}
 
-object CrossoverComputation {
-  def findMathCapableImplementation(args: CommandLineArgs, paramName: String): CrossoverComputation = {
-    args.getString(paramName, "(expected a name for crossover computation)") match {
+object CrossoverComputation:
+  def findMathCapableImplementation(args: CommandLineArgs, paramName: String): CrossoverComputation =
+    args.getString(paramName, "(expected a name for crossover computation)") match
       case "legacy" => LegacyCollectiveCrossoverComputation
       case "basic" => BasicSeparateCrossoverComputation
       case "0check" => ZeroCheckingSeparateCrossoverComputation
       case other => throw new IllegalArgumentException(s"I don't know the crossover computation implementation named '$other'")
-    }
-  }
-}
